@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int         @id @default(autoincrement())
+  name        String?
+  phone       String      @unique
+  password    String
+  role        Role
+  bookings    Booking[]
+  comments    Comment[]
+  travels     Travel[]    @relation("CreatedTravels")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  Ticket Ticket[]
+
+  Payment Payment[]
+}
+
+model Travel {
+  id          Int         @id @default(autoincrement())
+  title       String
+  description String
+  startDate   DateTime
+  endDate     DateTime
+  price       Float
+  itinerary   String?
+  requirements String?
+  status      TravelStatus @default(PLANNED)
+  bookings    Booking[]
+  documents   TravelDocument[]
+  comments    Comment[]
+  createdBy   User        @relation("CreatedTravels", fields: [createdById], references: [id])
+  createdById Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Booking {
+  id          Int         @id @default(autoincrement())
+  traveler    User        @relation(fields: [travelerId], references: [id])
+  travelerId  Int
+  travel      Travel      @relation(fields: [travelId], references: [id])
+  travelId    Int
+  status      BookingStatus @default(PENDING)
+  tickets     Ticket[]    
+  payment     Payment?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Ticket {
+  id          Int         @id @default(autoincrement())
+  booking     Booking     @relation(fields: [bookingId], references: [id])
+  bookingId   Int
+  name        String
+  age         Int
+  badgeNumber String?     
+  qrCodeUrl   String?     
+  checkedIn   Boolean     @default(false)
+  checkedInBy User?       @relation(fields: [checkedInById], references: [id])
+  checkedInById Int?      
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Payment {
+  id          Int         @id @default(autoincrement())
+  booking     Booking     @relation(fields: [bookingId], references: [id])
+  bookingId   Int @unique
+  receiptUrl  String
+  status      PaymentStatus @default(PENDING)
+  approvedBy  User?       @relation(fields: [approvedById], references: [id])
+  approvedById Int?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model TravelDocument {
+  id          Int         @id @default(autoincrement())
+  travel      Travel      @relation(fields: [travelId], references: [id])
+  travelId    Int
+  title       String
+  fileUrl     String
+  createdAt   DateTime    @default(now())
+}
+
+model Comment {
+  id          Int         @id @default(autoincrement())
+  content     String
+  type        CommentType
+  traveler    User        @relation(fields: [travelerId], references: [id])
+  travelerId  Int
+  travel      Travel      @relation(fields: [travelId], references: [id])
+  travelId    Int
+  createdAt   DateTime    @default(now())
+}
+
+enum Role {
+  TRAVELER
+  MANAGER
+  SUPERVISOR
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TravelStatus {
+  PLANNED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum CommentType {
+  PRE_TRAVEL
+  POST_TRAVEL
+}
