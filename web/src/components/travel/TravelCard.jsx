@@ -19,7 +19,14 @@ const TravelCard = ({ travel }) => {
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden transition-transform duration-200 hover:shadow-lg hover:-translate-y-1">
       <div className="relative">
-        <div className="bg-gray-200 border-2 border-dashed rounded-xl w-full h-48" />
+        <div className="bg-gray-200 rounded-xl w-full h-48">
+          <img
+            src={
+              "https://i0.wp.com/visitbalitour.com/wp-content/uploads/2015/07/bali-tour.jpg?fit=1500%2C834&ssl=1"
+            }
+            className="w-full h-full object-cover"
+          />
+        </div>
         <span
           className={`absolute top-2 right-2 px-3 py-1 rounded-full text-xs font-medium ${
             statusColors[travel.status]

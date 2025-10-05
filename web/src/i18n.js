@@ -53,7 +53,7 @@ const resources = {
       securePaymentsDesc: "ሁሉም ግብይቶች በደህናነት ይከናወናሉ እና በተለያዩ የክፍያ አማራጮች ይገናኛሉ።",
       support247: "24/7 ድጋፍ",
       support247Desc: "የተሟላ የድጋፍ ቡድናችን ሁልጊዜ ዝግጁ ነው።",
-      aboutSaint: "ስለ ፀደቁ",
+      aboutSaint: "ስለ ጻድቁ",
       readMore: "ተጨማሪ አንብብ",
       readLess: "ያነሰ አንብብ",
     },

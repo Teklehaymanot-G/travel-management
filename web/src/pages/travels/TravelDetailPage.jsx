@@ -85,7 +85,14 @@ const TravelDetailPage = () => {
         {/* Left Column */}
         <div className="md:w-2/3">
           <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-            <div className="bg-gray-200 border-2 border-dashed rounded-xl w-full h-64" />
+            <div className="bg-gray-200 rounded-xl w-full h-64">
+              <img
+                src={
+                  "https://i0.wp.com/visitbalitour.com/wp-content/uploads/2015/07/bali-tour.jpg?fit=1500%2C834&ssl=1"
+                }
+                className="w-full h-full object-cover"
+              />
+            </div>
           </div>
 
           <div className="bg-white rounded-lg shadow mb-6">

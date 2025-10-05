@@ -95,7 +95,9 @@ const TravelManagement = () => {
           setIsDialogOpen(false);
         }}
       >
-        <div className="space-y-4">
+        <div className="space-y-4 bg-white rounded-lg">
+          {" "}
+          {/* Ensure modal content is white */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Title
@@ -109,7 +111,6 @@ const TravelManagement = () => {
               }
             />
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -144,7 +145,6 @@ const TravelManagement = () => {
               />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -181,7 +181,6 @@ const TravelManagement = () => {
               </select>
             </div>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Description

@@ -197,7 +197,7 @@ const Sidebar = () => {
         <div className="flex flex-col h-0 flex-1 border-r border-gray-200 bg-white">
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
             <div className="flex items-center flex-shrink-0 px-4">
-              <h1 className="text-xl font-bold text-blue-600">TravelAdmin</h1>
+              <h1 className="text-xl font-bold text-blue-600">Travel Admin</h1>
             </div>
             <nav className="mt-5 flex-1 px-2 space-y-1">
               {navigation

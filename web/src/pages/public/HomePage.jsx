@@ -36,18 +36,21 @@ const HomePage = () => {
 
       {/* Language Switcher */}
       <div className="absolute top-4 right-4 z-10">
-        <button
-          onClick={() => i18n.changeLanguage("en")}
-          className="mr-2 px-2 py-1 border rounded"
-        >
-          EN
-        </button>
-        <button
-          onClick={() => i18n.changeLanguage("am")}
-          className="px-2 py-1 border rounded"
-        >
-          AM
-        </button>
+        {i18n.language === "am" ? (
+          <button
+            onClick={() => i18n.changeLanguage("en")}
+            className="mr-2 px-2 py-1 border rounded text-white bg-blue-600 hover:bg-blue-700"
+          >
+            EN
+          </button>
+        ) : (
+          <button
+            onClick={() => i18n.changeLanguage("am")}
+            className="px-2 py-1 border rounded text-white bg-blue-600 hover:bg-blue-700"
+          >
+            AM
+          </button>
+        )}
       </div>
       {/* Hero Section */}
       <div className="relative bg-blue-700 text-white">

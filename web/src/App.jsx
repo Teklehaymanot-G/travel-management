@@ -10,6 +10,7 @@ import { useAuth } from "./contexts/AuthContext";
 import LoginPage from "./pages/auth/LoginPage";
 import HomePage from "./pages/public/HomePage";
 import ManagerAppRouter from "./routes/ManagerAppRouter";
+import TravelerAppRouter from "./routes/TravelerAppRoute";
 
 function App() {
   const { user } = useAuth();
