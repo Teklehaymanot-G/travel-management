@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   countryPicker: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 16,
     borderRightWidth: 2,
     borderRightColor: "#E5E7EB",
@@ -139,13 +139,13 @@ const styles = StyleSheet.create({
   },
   flag: {
     fontSize: 20,
-    marginRight: 8,
+    marginRight: 4,
   },
   dialCode: {
     fontSize: 16,
     fontWeight: "600",
     color: "#4F46E5",
-    marginRight: 8,
+    marginRight: 2,
   },
   input: {
     flex: 1,
