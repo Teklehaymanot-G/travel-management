@@ -23,6 +23,7 @@ const RootStack = () => {
       <Stack.Screen name="OTPVerification" component={OTPVerificationScreen} />
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
       <Stack.Screen name="TravelDetail" component={TravelDetailScreen} />
+      <Stack.Screen name="Comment" component={CommentScreen} />
       <Stack.Screen name="Booking" component={BookingScreen} />
       <Stack.Screen
         name="BookingConfirmation"

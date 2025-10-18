@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import PaymentSection from "./PaymentSection";
 
 type Travel = { id: string; title: string; price: number };
 const travelData: { [key: string]: Travel } = {
@@ -206,6 +207,8 @@ export default function BookingScreen() {
             <Ionicons name="chevron-forward" size={20} color="#cbd5e0" />
           </TouchableOpacity>
         </View>
+
+        <PaymentSection />
 
         <View style={styles.termsContainer}>
           <Text style={styles.termsText}>

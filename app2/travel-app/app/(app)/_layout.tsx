@@ -1,9 +1,6 @@
-import { useLanguage } from "@/src/context/LanguageContext";
 import { Stack } from "expo-router";
 
 export default function AppLayout() {
-  const { isRTL } = useLanguage();
-
   return (
     <Stack
       screenOptions={{
@@ -15,6 +12,7 @@ export default function AppLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="travel-detail/[id]" />
       <Stack.Screen name="booking/[id]" />
+      {/* <Stack.Screen name="comments/[id]" /> */}
     </Stack>
   );
 }

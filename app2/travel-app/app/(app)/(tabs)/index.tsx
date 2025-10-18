@@ -50,6 +50,24 @@ const travelDestinations = [
     image: "https://images.unsplash.com/photo-1560264280-88f9318fdead?w=300",
     duration: "2 days",
   },
+  {
+    id: "5",
+    title: "Simien Mountains Trek",
+    location: "Simien Mountains, Ethiopia",
+    price: 520,
+    rating: 4.7,
+    image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300",
+    duration: "5 days",
+  },
+  {
+    id: "6",
+    title: "Blue Nile Falls",
+    location: "Bahir Dar, Ethiopia",
+    price: 320,
+    rating: 4.5,
+    image: "https://images.unsplash.com/photo-1560264280-88f9318fdead?w=300",
+    duration: "2 days",
+  },
 ];
 
 export default function DiscoverScreen() {
@@ -144,10 +162,10 @@ export default function DiscoverScreen() {
               />
               <View style={styles.travelContent}>
                 <Text style={styles.travelTitle}>{travel.title}</Text>
-                <Text style={styles.travelLocation}>
+                {/* <Text style={styles.travelLocation}>
                   <Ionicons name="location-outline" size={14} color="#718096" />
                   {travel.location}
-                </Text>
+                </Text> */}
 
                 <View style={styles.travelDetails}>
                   <View style={styles.travelDetail}>
@@ -156,14 +174,16 @@ export default function DiscoverScreen() {
                       {travel.duration}
                     </Text>
                   </View>
-                  <View style={styles.travelDetail}>
+                  {/* <View style={styles.travelDetail}>
                     <Ionicons name="star" size={14} color="#f6ad55" />
                     <Text style={styles.travelDetailText}>{travel.rating}</Text>
-                  </View>
+                  </View> */}
                 </View>
 
                 <View style={styles.travelFooter}>
-                  <Text style={styles.travelPrice}>${travel.price}</Text>
+                  <Text style={styles.travelPrice}>
+                    {travel.price} {t("br")}
+                  </Text>
                   <Text style={styles.travelPriceLabel}>{t("per_person")}</Text>
                 </View>
               </View>
@@ -182,7 +202,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 32,
   },
   headerContent: {
