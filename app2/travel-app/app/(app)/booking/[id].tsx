@@ -197,17 +197,6 @@ export default function BookingScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("payment_method")}</Text>
-          <TouchableOpacity style={styles.paymentMethod}>
-            <View style={styles.paymentLeft}>
-              <Ionicons name="card-outline" size={24} color="#4a5568" />
-              <Text style={styles.paymentText}>{t("credit_debit_card")}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#cbd5e0" />
-          </TouchableOpacity>
-        </View>
-
         <PaymentSection />
 
         <View style={styles.termsContainer}>

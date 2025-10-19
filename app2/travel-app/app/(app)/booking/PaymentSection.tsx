@@ -143,22 +143,6 @@ const PaymentSection = () => {
         </View>
         <Ionicons name="chevron-forward" size={20} color="#cbd5e0" />
       </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.paymentMethod}
-        onPress={() => handlePaymentMethodSelect("card")}
-      >
-        <View style={styles.paymentLeft}>
-          <Ionicons name="card-outline" size={24} color="#4a5568" />
-          <View style={styles.paymentTextContainer}>
-            <Text style={styles.paymentText}>{t("credit_debit_card")}</Text>
-            <Text style={styles.paymentSubtext}>
-              {t("card_payment_description")}
-            </Text>
-          </View>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color="#cbd5e0" />
-      </TouchableOpacity>
     </View>
   );
 
