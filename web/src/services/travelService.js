@@ -16,13 +16,32 @@ export const getTravel = async (id) => {
 
 // Create travel
 export const createTravel = async (data) => {
-  const res = await apiClient.post(API_URL, data);
+  // If FormData is provided, ensure correct headers override JSON default
+  const isForm = typeof FormData !== "undefined" && data instanceof FormData;
+  const config = isForm
+    ? { headers: { "Content-Type": "multipart/form-data" } }
+    : undefined;
+  const res = await apiClient.post(API_URL, data, config);
   return res.data;
 };
 
 // Update travel
 export const updateTravel = async (id, data) => {
-  const res = await apiClient.put(`${API_URL}/${id}`, data);
+  const isForm = typeof FormData !== "undefined" && data instanceof FormData;
+  const config = isForm
+    ? { headers: { "Content-Type": "multipart/form-data" } }
+    : undefined;
+  const res = await apiClient.put(`${API_URL}/${id}`, data, config);
+  return res.data;
+};
+
+// Upload or replace only the image for a travel
+export const uploadTravelImage = async (id, file) => {
+  const form = new FormData();
+  form.append("image", file);
+  const res = await apiClient.put(`${API_URL}/${id}/image`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
   return res.data;
 };
 

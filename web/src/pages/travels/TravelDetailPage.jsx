@@ -1,27 +1,40 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import CommentCard from "../../components/comments/CommentCard";
 import DocumentCard from "../../components/documents/DocumentCard";
 import Button from "../../components/ui/Button";
-import { getTravel } from "../../services/travelService";
+import { getTravel, updateTravel } from "../../services/travelService";
 import { comments, documents } from "../../utils/dummyData";
 import { formatCurrency, getStatusBadge } from "../../utils/helpers";
 
 const TravelDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("details");
   const [newComment, setNewComment] = useState("");
 
-  const [travel, setTravel] = useState([]);
+  const [travel, setTravel] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
 
   useEffect(() => {
-    const fetchTravels = async () => {
-      const data = await getTravel(id);
-      console.log(data?.data);
-      setTravel(data?.data || []);
+    const fetchTravel = async () => {
+      const res = await getTravel(id);
+      const t = res?.data;
+      setTravel(t);
+      setEditForm({
+        title: t?.title || "",
+        description: t?.description || "",
+        price: t?.price || 0,
+        itinerary: t?.itinerary || "",
+        requirements: t?.requirements || "",
+      });
     };
-    fetchTravels();
+    fetchTravel();
   }, [id]);
 
   if (!travel) {
@@ -49,9 +62,64 @@ const TravelDetailPage = () => {
     (comment) => comment.travelId === travel.id
   );
 
+  const handleToggleEdit = () => setIsEditing((e) => !e);
+
+  const handleEditChange = (field, value) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      setActionMessage("");
+      await updateTravel(travel.id, {
+        title: editForm.title.trim(),
+        description: editForm.description.trim(),
+        price: Number(editForm.price),
+        itinerary: editForm.itinerary,
+        requirements: editForm.requirements,
+      });
+      setIsEditing(false);
+      const refreshed = await getTravel(travel.id);
+      setTravel(refreshed.data);
+      setActionMessage("Travel updated successfully.");
+      setTimeout(() => setActionMessage(""), 3000);
+    } catch (e) {
+      console.error(e);
+      setActionMessage("Failed to update travel.");
+    }
+  };
+
+  const handleStatusUpdate = async (nextStatus) => {
+    try {
+      setStatusUpdating(true);
+      setActionMessage("");
+      await updateTravel(travel.id, { status: nextStatus });
+      const refreshed = await getTravel(travel.id);
+      setTravel(refreshed.data);
+      setActionMessage(`Status changed to ${nextStatus}.`);
+      setTimeout(() => setActionMessage(""), 3000);
+    } catch (e) {
+      console.error(e);
+      setActionMessage("Failed to update status.");
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    // Placeholder: in a full UI we'd select a booking; for now, travelers cancel their own latest booking
+    try {
+      setActionMessage("");
+      // This requires knowing booking id; left for future expansion.
+      setActionMessage("Provide booking selection to cancel.");
+    } catch (e) {
+      console.error(e);
+      setActionMessage("Failed to cancel booking.");
+    }
+  };
+
   const handleAddComment = () => {
     if (newComment.trim() === "") return;
-
     // In a real app, this would call an API
     console.log("Adding comment:", newComment);
     setNewComment("");
@@ -62,7 +130,18 @@ const TravelDetailPage = () => {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-6 flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">{travel.title}</h1>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+            {isEditing ? (
+              <input
+                type="text"
+                value={editForm.title}
+                onChange={(e) => handleEditChange("title", e.target.value)}
+                className="border px-2 py-1 rounded w-full max-w-sm"
+              />
+            ) : (
+              travel.title
+            )}
+          </h1>
           <div className="flex items-center mt-2">
             <span
               className={`px-2 py-1 rounded-full text-xs ${
@@ -72,7 +151,8 @@ const TravelDetailPage = () => {
               {getStatusBadge(travel.status).text}
             </span>
             <span className="ml-3 text-gray-600">
-              {travel.startDate} - {travel.endDate}
+              {new Date(travel.startDate).toLocaleDateString()} -{" "}
+              {new Date(travel.endDate).toLocaleDateString()}
             </span>
           </div>
         </div>
@@ -88,8 +168,11 @@ const TravelDetailPage = () => {
             <div className="bg-gray-200 rounded-xl w-full h-64">
               <img
                 src={
-                  "https://i0.wp.com/visitbalitour.com/wp-content/uploads/2015/07/bali-tour.jpg?fit=1500%2C834&ssl=1"
+                  travel.imageUrl && travel.imageUrl.trim() !== ""
+                    ? travel.imageUrl
+                    : "https://i0.wp.com/visitbalitour.com/wp-content/uploads/2015/07/bali-tour.jpg?fit=1500%2C834&ssl=1"
                 }
+                alt={travel.title || "Travel image"}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -119,10 +202,30 @@ const TravelDetailPage = () => {
             <div className="p-6">
               {activeTab === "details" && (
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">
-                    Travel Details
+                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center justify-between">
+                    <span>Travel Details</span>
+                    {!isEditing && user?.role !== "TRAVELER" && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleToggleEdit}
+                      >
+                        Edit
+                      </Button>
+                    )}
                   </h3>
-                  <p className="text-gray-600 mb-6">{travel.description}</p>
+                  {isEditing ? (
+                    <textarea
+                      rows={4}
+                      value={editForm.description}
+                      onChange={(e) =>
+                        handleEditChange("description", e.target.value)
+                      }
+                      className="w-full border rounded p-2 mb-4"
+                    />
+                  ) : (
+                    <p className="text-gray-600 mb-6">{travel.description}</p>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div className="bg-blue-50 rounded-lg p-4">
@@ -130,7 +233,18 @@ const TravelDetailPage = () => {
                         Price
                       </h4>
                       <p className="text-xl font-bold">
-                        {formatCurrency(travel.price)}
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            value={editForm.price}
+                            onChange={(e) =>
+                              handleEditChange("price", e.target.value)
+                            }
+                            className="border rounded px-2 py-1 w-32"
+                          />
+                        ) : (
+                          formatCurrency(travel.price)
+                        )}
                       </p>
                       <p className="text-sm text-gray-600 mt-1">per person</p>
                     </div>
@@ -153,9 +267,21 @@ const TravelDetailPage = () => {
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
                     Itinerary
                   </h3>
-                  <pre className="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap font-sans">
-                    {travel.itinerary || "No itinerary available"}
-                  </pre>
+                  {isEditing ? (
+                    <textarea
+                      rows={8}
+                      value={editForm.itinerary}
+                      onChange={(e) =>
+                        handleEditChange("itinerary", e.target.value)
+                      }
+                      className="w-full border rounded p-2 whitespace-pre-wrap font-mono text-sm"
+                      placeholder="Day 1: ...\nDay 2: ..."
+                    />
+                  ) : (
+                    <pre className="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap font-sans">
+                      {travel.itinerary || "No itinerary available"}
+                    </pre>
+                  )}
                 </div>
               )}
 
@@ -164,9 +290,21 @@ const TravelDetailPage = () => {
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
                     Requirements
                   </h3>
-                  <pre className="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap font-sans">
-                    {travel.requirements || "No special requirements"}
-                  </pre>
+                  {isEditing ? (
+                    <textarea
+                      rows={6}
+                      value={editForm.requirements}
+                      onChange={(e) =>
+                        handleEditChange("requirements", e.target.value)
+                      }
+                      className="w-full border rounded p-2 whitespace-pre-wrap font-mono text-sm"
+                      placeholder="Passport validity, vaccination, ..."
+                    />
+                  ) : (
+                    <pre className="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap font-sans">
+                      {travel.requirements || "No special requirements"}
+                    </pre>
+                  )}
                 </div>
               )}
 
@@ -231,18 +369,75 @@ const TravelDetailPage = () => {
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Actions</h3>
             <div className="space-y-3">
-              <Button variant="primary" fullWidth>
-                Edit Travel Details
-              </Button>
-              <Button variant="secondary" fullWidth>
-                Manage Bookings
-              </Button>
-              <Button variant="warning" fullWidth>
-                Update Status
-              </Button>
-              <Button variant="danger" fullWidth>
-                Cancel Travel
-              </Button>
+              {user?.role === "TRAVELER" ? (
+                <Button
+                  variant="primary"
+                  fullWidth
+                  onClick={() => navigate(`/travel/travels/${id}/register`)}
+                >
+                  Book This Travel
+                </Button>
+              ) : (
+                <>
+                  {!isEditing ? (
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      onClick={handleToggleEdit}
+                    >
+                      Edit Travel Details
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        fullWidth
+                        onClick={handleToggleEdit}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="primary"
+                        fullWidth
+                        onClick={handleSaveEdit}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="warning"
+                      disabled={statusUpdating}
+                      onClick={() => handleStatusUpdate("ONGOING")}
+                    >
+                      Set Ongoing
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={statusUpdating}
+                      onClick={() => handleStatusUpdate("COMPLETED")}
+                    >
+                      Set Completed
+                    </Button>
+                    <Button
+                      variant="danger"
+                      disabled={statusUpdating}
+                      onClick={() => handleStatusUpdate("CANCELLED")}
+                    >
+                      Cancel Travel
+                    </Button>
+                    <Button variant="secondary" onClick={handleCancelBooking}>
+                      Cancel Booking
+                    </Button>
+                  </div>
+                </>
+              )}
+              {actionMessage && (
+                <div className="text-xs text-center text-blue-600 mt-2">
+                  {actionMessage}
+                </div>
+              )}
             </div>
           </div>
         </div>

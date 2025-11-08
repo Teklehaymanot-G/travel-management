@@ -4,6 +4,7 @@ import { useAuth } from "../../contexts/AuthContext";
 
 const Sidebar = () => {
   const { user } = useAuth();
+  const role = (user?.role ?? "").toString().trim().toUpperCase();
 
   const navigation = [
     {
@@ -49,6 +50,18 @@ const Sidebar = () => {
       roles: ["MANAGER"],
     },
   ];
+
+  // Traveler-specific menu
+  const travelerNavigation = [
+    {
+      name: "Travels",
+      href: "/travel/travels",
+      icon: "travel",
+      roles: ["TRAVELER"],
+    },
+  ];
+
+  const menu = role === "TRAVELER" ? travelerNavigation : navigation;
 
   const getIcon = (iconName) => {
     switch (iconName) {
@@ -200,8 +213,8 @@ const Sidebar = () => {
               <h1 className="text-xl font-bold text-blue-600">Travel Admin</h1>
             </div>
             <nav className="mt-5 flex-1 px-2 space-y-1">
-              {navigation
-                .filter((item) => item.roles.includes(user?.role))
+              {menu
+                .filter((item) => item.roles.includes(role))
                 .map((item) => (
                   <NavLink
                     key={item.name}
@@ -220,6 +233,12 @@ const Sidebar = () => {
                     {item.name}
                   </NavLink>
                 ))}
+              {menu.filter((item) => item.roles.includes(role)).length ===
+                0 && (
+                <div className="text-sm text-gray-500 px-2 py-2">
+                  No menu items for your role
+                </div>
+              )}
             </nav>
           </div>
           <div className="flex-shrink-0 flex border-t border-gray-200 p-4">

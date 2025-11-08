@@ -4,6 +4,7 @@ import ManagerPage from "../pages/dashboard/ManagerPage";
 import SupervisorPage from "../pages/dashboard/SupervisorPage";
 import TravelListPage from "../pages/travels/TravelListPage";
 import TravelDetailPage from "../pages/travels/TravelDetailPage";
+import TravelCreatePage from "../pages/travels/TravelCreatePage";
 import NotFoundPage from "../pages/404";
 import { useAuth } from "../contexts/AuthContext";
 import BookingManagement from "../components/management/BookingManagement";
@@ -52,6 +53,7 @@ const ManagerAppRouter = () => {
 
         {/* Shared routes */}
         <Route path="travels" element={<TravelListPage />} />
+        <Route path="travels/new" element={<TravelCreatePage />} />
         <Route path="travels/:id" element={<TravelDetailPage />} />
         <Route path="bookings" element={<BookingManagement />} />
         <Route path="payments" element={<PaymentManagement />} />

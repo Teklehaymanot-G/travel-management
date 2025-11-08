@@ -14,6 +14,7 @@ const bookingRoutes = require("./routes/bookings");
 const paymentRoutes = require("./routes/payments");
 const documentRoutes = require("./routes/documents");
 const commentRoutes = require("./routes/comments");
+const couponRoutes = require("./routes/coupons");
 const roleRoutes = require("./routes/roles"); // Add this line
 
 // Import middleware
@@ -68,6 +69,7 @@ app.use("/api/payments", authMiddleware, paymentRoutes);
 app.use("/api/documents", documentRoutes); // Updated - some routes are public
 app.use("/api/comments", commentRoutes); // Updated - some routes are public
 app.use("/api/roles", authMiddleware, roleRoutes); // Add this line
+app.use("/api/coupons", couponRoutes);
 
 // Health Check
 app.get("/api/health", (req, res) => {

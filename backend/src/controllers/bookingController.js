@@ -208,9 +208,45 @@ const updateBookingStatus = async (req, res, next) => {
   }
 };
 
+// Cancel own booking (traveler)
+const cancelMyBooking = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: parseInt(id) },
+      select: { id: true, travelerId: true, status: true },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (booking.travelerId !== req.user.id && req.user.role !== "MANAGER") {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to cancel this booking" });
+    }
+
+    if (booking.status === "REJECTED") {
+      return res.json({ success: true, data: booking });
+    }
+
+    const updated = await prisma.booking.update({
+      where: { id: booking.id },
+      data: { status: "REJECTED" },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getUserBookings,
   getAllBookings,
   createBooking,
   updateBookingStatus,
+  cancelMyBooking,
 };

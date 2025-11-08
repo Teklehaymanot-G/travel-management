@@ -50,7 +50,9 @@ const LoginModal = ({ visible, onClose }) => {
       if (data) {
         login({ ...data?.user, token: data?.token });
         handleClose();
-        navigate(data?.user.role === "TRAVELER" ? "/mobile" : "/admin");
+        // Navigate to the correct route for the role. Use '/travel' for travelers
+        // (the app routes use '/travel/*') and '/admin' for managers/supervisors.
+        navigate(data?.user.role === "TRAVELER" ? "/travel" : "/admin");
       } else {
         setError("የስልክ ቁጥር ወይም የይለፍ ቃል ትክክል አይደለም");
       }

@@ -1,5 +1,8 @@
 import React from "react";
 
+// rows can be either:
+// - Array<Array<ReactNode>> (legacy)
+// - Array<{ cells: Array<ReactNode>, data?: any }> (preferred)
 const DataGrid = ({
   headers,
   rows,
@@ -30,43 +33,51 @@ const DataGrid = ({
         </thead>
         <tbody className="divide-y divide-gray-200 bg-white">
           {rows.length > 0 ? (
-            rows.map((row, rowIndex) => (
-              <tr
-                key={rowIndex}
-                className={onRowClick ? "hover:bg-gray-50 cursor-pointer" : ""}
-                onClick={() => onRowClick && onRowClick(row)}
-              >
-                {row.map((cell, cellIndex) => (
-                  <td
-                    key={cellIndex}
-                    className="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900 sm:pl-6"
-                  >
-                    {cell}
-                  </td>
-                ))}
-                {actions.length > 0 && (
-                  <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                    <div className="flex space-x-2 justify-end">
-                      {actions.map((action, actionIndex) => (
-                        <button
-                          key={actionIndex}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            action.onClick(row);
-                          }}
-                          className={`${
-                            action.className ||
-                            "text-blue-600 hover:text-blue-900"
-                          }`}
-                        >
-                          {action.label}
-                        </button>
-                      ))}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))
+            rows.map((row, rowIndex) => {
+              const isObjectRow =
+                row && typeof row === "object" && !Array.isArray(row);
+              const cells = isObjectRow ? row.cells || [] : row;
+              const data = isObjectRow ? row.data : row;
+              return (
+                <tr
+                  key={rowIndex}
+                  className={
+                    onRowClick ? "hover:bg-gray-50 cursor-pointer" : ""
+                  }
+                  onClick={() => onRowClick && onRowClick(data)}
+                >
+                  {cells.map((cell, cellIndex) => (
+                    <td
+                      key={cellIndex}
+                      className="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-900 sm:pl-6"
+                    >
+                      {cell}
+                    </td>
+                  ))}
+                  {actions.length > 0 && (
+                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                      <div className="flex space-x-2 justify-end">
+                        {actions.map((action, actionIndex) => (
+                          <button
+                            key={actionIndex}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              action.onClick(data);
+                            }}
+                            className={`${
+                              action.className ||
+                              "text-blue-600 hover:text-blue-900"
+                            }`}
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              );
+            })
           ) : (
             <tr>
               <td

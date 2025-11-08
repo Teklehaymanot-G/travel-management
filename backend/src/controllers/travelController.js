@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
+const path = require("path");
 
 // Get all travels with filters
 const getTravels = async (req, res, next) => {
@@ -130,6 +131,15 @@ const createTravel = async (req, res, next) => {
       requirements,
     } = req.body;
 
+    // If an image file is uploaded, construct a served URL
+    let imageUrl;
+    if (req.file) {
+      const rel = `/uploads/travels/${req.file.filename}`;
+      imageUrl = `${req.protocol}://${req.get("host")}${rel}`;
+    } else if (req.body.imageUrl) {
+      imageUrl = req.body.imageUrl; // fallback support
+    }
+
     const travel = await prisma.travel.create({
       data: {
         title,
@@ -137,8 +147,10 @@ const createTravel = async (req, res, next) => {
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         price: parseFloat(price),
+        imageUrl,
         itinerary,
         requirements,
+        status: "PLANNED", // force default status on creation
         createdById: req.user.id,
       },
       include: {
@@ -184,9 +196,10 @@ const updateTravel = async (req, res, next) => {
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
         price: price ? parseFloat(price) : undefined,
+        imageUrl: req.body.imageUrl,
         itinerary,
         requirements,
-        status,
+        status, // allow explicit status changes only via update
       },
       include: {
         createdBy: {
@@ -203,6 +216,29 @@ const updateTravel = async (req, res, next) => {
       success: true,
       data: travel,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Upload/replace travel image only
+const uploadTravelImage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file uploaded" });
+    }
+
+    const rel = `/uploads/travels/${req.file.filename}`;
+    const imageUrl = `${req.protocol}://${req.get("host")}${rel}`;
+
+    const travel = await prisma.travel.update({
+      where: { id: parseInt(id) },
+      data: { imageUrl },
+    });
+
+    res.json({ success: true, data: travel });
   } catch (error) {
     next(error);
   }
@@ -232,4 +268,5 @@ module.exports = {
   createTravel,
   updateTravel,
   deleteTravel,
+  uploadTravelImage,
 };

@@ -2,6 +2,7 @@ import React from "react";
 import { formatCurrency } from "../../utils/helpers";
 
 const TravelCard = ({ travel }) => {
+  const PLACEHOLDER = "/saint.jpeg"; // local asset from public/
   const statusColors = {
     PLANNED: "bg-blue-100 text-blue-800",
     ONGOING: "bg-green-100 text-green-800",
@@ -16,15 +17,51 @@ const TravelCard = ({ travel }) => {
     CANCELLED: "Cancelled",
   };
 
+  // Helper to build absolute image URL when backend returns relative path (e.g. "uploads/travels/filename.jpg")
+  const resolveImageUrl = (raw) => {
+    if (!raw || !raw.trim()) return null;
+    const normalized = raw.replace(/\\/g, "/"); // handle Windows backslashes
+    if (/^https?:\/\//i.test(normalized)) return normalized; // already absolute
+    // Strip query/hash early (not expected but safe)
+    const withoutQuery = normalized.split(/[?#]/)[0];
+    // Normalize leading slashes and ./
+    const cleaned = withoutQuery.replace(/^\.\/+/, "").replace(/^\/+/, "");
+    // Remove accidental leading "uploads/" duplication (e.g., uploads/uploads/travels/...)
+    const deduped = cleaned.replace(/^uploads\/uploads\//, "uploads/");
+    // Ensure begins with uploads/
+    const path = deduped.startsWith("uploads/")
+      ? deduped
+      : `uploads/${deduped}`;
+    const base = (
+      import.meta.env?.VITE_API_URL || "http://localhost:5000/api"
+    ).replace(/\/$/, "");
+    const root = base.endsWith("/api") ? base.slice(0, -4) : base;
+    const resolved = `${root}/${path}`;
+    if (import.meta.env?.DEV) {
+      console.debug("[TravelCard] resolveImageUrl", {
+        raw,
+        normalized,
+        cleaned,
+        deduped,
+        resolved,
+      });
+    }
+    return resolved;
+  };
+
+  const imageSrc = resolveImageUrl(travel.imageUrl) || PLACEHOLDER;
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden transition-transform duration-200 hover:shadow-lg hover:-translate-y-1">
       <div className="relative">
-        <div className="bg-gray-200 rounded-xl w-full h-48">
+        <div className="bg-gray-200 rounded-xl w-full h-48 overflow-hidden">
           <img
-            src={
-              "https://i0.wp.com/visitbalitour.com/wp-content/uploads/2015/07/bali-tour.jpg?fit=1500%2C834&ssl=1"
-            }
+            src={imageSrc}
+            alt={travel.title || "Travel image"}
             className="w-full h-full object-cover"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = PLACEHOLDER;
+            }}
           />
         </div>
         <span
