@@ -40,12 +40,29 @@ app.use(
   })
 );
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
+// Rate limiting (relaxed in development to avoid accidental 429 during rapid refresh/hot reload)
+if (process.env.NODE_ENV === "production") {
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // production hard cap per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use(limiter);
+} else {
+  // In development, apply a much higher limit but still guard extreme abuse
+  const devLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes window
+    max: 2000, // practically unbounded for normal dev usage
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      message: "Too many requests in a short time (dev)",
+      hint: "If you truly need load testing, disable the dev limiter or use production mode.",
+    },
+  });
+  app.use(devLimiter);
+}
 
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));

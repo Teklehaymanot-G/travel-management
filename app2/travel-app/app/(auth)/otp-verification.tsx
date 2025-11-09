@@ -4,10 +4,10 @@ import React from "react";
 
 export default function OTPVerification() {
   const navigation = useNavigation();
-  const { phone } = useLocalSearchParams();
+  const { phone, name } = useLocalSearchParams();
   console.log("otp");
   // Provide a route object with params to keep compatibility with screens
-  const route = { params: { phone } };
+  const route = { params: { phone, name } };
 
   return <OTPVerificationScreen route={route} navigation={navigation} />;
 }

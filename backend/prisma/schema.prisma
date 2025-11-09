@@ -15,6 +15,7 @@ model User {
   role        Role
   bookings    Booking[]
   comments    Comment[]
+  commentLikes CommentLike[]
   travels     Travel[]    @relation("CreatedTravels")
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -101,7 +102,20 @@ model Comment {
   travelerId  Int
   travel      Travel      @relation(fields: [travelId], references: [id])
   travelId    Int
+  likes       CommentLike[]
   createdAt   DateTime    @default(now())
+}
+
+model CommentLike {
+  id        Int      @id @default(autoincrement())
+  comment   Comment  @relation(fields: [commentId], references: [id])
+  commentId Int
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId])
+  @@index([userId])
 }
 
 enum Role {
@@ -152,4 +166,18 @@ model Coupon {
   active     Boolean    @default(true)
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
+}
+
+model Otp {
+  id        Int      @id @default(autoincrement())
+  phone     String   @db.VarChar(20)
+  codeHash  String
+  purpose   String   @db.VarChar(16) // e.g., 'register', 'login', 'reset'
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phone, purpose, expiresAt])
 }

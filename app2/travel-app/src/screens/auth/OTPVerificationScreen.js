@@ -21,7 +21,7 @@ import { useAuth } from "../../context/AuthContext";
 const OTPVerificationScreen = ({ route, navigation }) => {
   const { t } = useTranslation();
   const { verifyOTP, resendOTP, isLoading } = useAuth();
-  const { phone } = route.params;
+  const { phone, name } = route.params;
   const router = useRouter();
 
   const [otp, setOtp] = useState("");
@@ -73,7 +73,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
       return;
     }
 
-    const success = await verifyOTP(phone, otp);
+  const success = await verifyOTP(phone, otp, { name });
     if (success) {
       // Navigate to the main app with tabs using Expo Router
       router.replace("/(app)/(tabs)");
@@ -105,7 +105,7 @@ const OTPVerificationScreen = ({ route, navigation }) => {
     }
   };
 
-  const maskedPhone = phone ? `${phone.slice(0, 4)}****${phone.slice(-3)}` : "";
+  const maskedPhone = phone ? `${phone.slice(0, 6)}****${phone.slice(-2)}` : "";
 
   return (
     <KeyboardAvoidingView

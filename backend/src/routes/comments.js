@@ -3,6 +3,8 @@ const {
   getTravelComments,
   createComment,
   deleteComment,
+  likeComment,
+  unlikeComment,
 } = require("../controllers/commentController");
 const auth = require("../middleware/auth");
 
@@ -19,5 +21,9 @@ router.post("/travel/:travelId", createComment);
 
 // Delete comment
 router.delete("/:id", deleteComment);
+
+// Like / Unlike
+router.post("/:id/like", likeComment);
+router.delete("/:id/like", unlikeComment);
 
 module.exports = router;

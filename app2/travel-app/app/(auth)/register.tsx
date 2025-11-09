@@ -26,7 +26,7 @@ const { width, height } = Dimensions.get("window");
 
 export default function RegisterScreen({ navigation }) {
   const { t, i18n } = useTranslation();
-  const { isLoading } = useAuth();
+  const { isLoading, requestOTP } = useAuth();
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -52,19 +52,16 @@ export default function RegisterScreen({ navigation }) {
   }, []);
 
   const handleRegister = async () => {
-    if (!isValid || !name || !email) {
+    if (!isValid || !name) {
       Alert.alert(t("incomplete_info"), t("please_fill_all_fields"), [
         { text: t("ok") },
       ]);
       return;
     }
-
-    // Handle registration logic here
-    Alert.alert(
-      t("registration_successful"),
-      t("account_created_successfully"),
-      [{ text: t("ok"), onPress: () => navigation.navigate("login") }]
-    );
+    const ok = await requestOTP(phone);
+    if (ok) {
+      navigation.navigate("otp-verification", { phone, name });
+    }
   };
 
   const toggleLanguage = () => {
@@ -189,7 +186,7 @@ export default function RegisterScreen({ navigation }) {
           <AppButton
             title={t("create_account")}
             onPress={handleRegister}
-            disabled={!isValid || !name || !email || isLoading}
+            disabled={!isValid || !name || isLoading}
             loading={isLoading}
             style={styles.registerButton}
             gradient={["#667eea", "#764ba2"]}

@@ -1,10 +1,14 @@
 import { format } from "date-fns";
 import { am, enUS } from "date-fns/locale";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
+  Image,
   Keyboard,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -12,56 +16,190 @@ import {
   View,
 } from "react-native";
 import theme from "../../config/theme";
+import { useAuth } from "../../context/AuthContext";
+import {
+  createComment,
+  deleteComment,
+  fetchComments,
+  likeComment,
+  unlikeComment,
+} from "../../services/commentService";
+import { resolveImageUrl } from "../../utils/image";
 import { isRTL } from "../../utils/rtl";
+
+const AVATAR_PLACEHOLDER =
+  "https://static.vecteezy.com/system/resources/previews/047/733/682/non_2x/grey-avatar-icon-user-avatar-photo-icon-social-media-user-icon-vector.jpg";
 
 const CommentScreen = ({ route }) => {
   const { t, i18n } = useTranslation();
   const { travel } = route.params;
+  const { user } = useAuth();
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState(null);
+  const limit = 20;
+  const [sending, setSending] = useState(false);
+  const [filterType, setFilterType] = useState("all"); // all | PRE_TRAVEL | POST_TRAVEL
+
+  const mapComment = useCallback(
+    (c) => ({
+      id: String(c.id),
+      userId: String(c.traveler?.id || c.travelerId || ""),
+      userName: c.traveler?.name || c.traveler?.phone || t("traveler"),
+      content: c.content,
+      type: c.type,
+      createdAt: c.createdAt,
+      likes: c.likesCount || 0,
+      isLiked: !!c.likedByMe,
+      avatar: c.traveler?.avatarUrl
+        ? resolveImageUrl(c.traveler.avatarUrl)
+        : AVATAR_PLACEHOLDER,
+      canDelete: String(c.traveler?.id) === String(user?.id),
+    }),
+    [user, t]
+  );
+
+  const loadComments = useCallback(
+    async (targetPage = 1, append = false) => {
+      if (!travel?.id) return;
+      try {
+        if (!append) setError(null);
+        if (append) {
+          setLoadingMore(true);
+        } else {
+          setLoadingInitial(true);
+        }
+        const res = await fetchComments(travel.id, {
+          page: targetPage,
+          limit,
+          type: filterType,
+        });
+        const mapped = (res.data || []).map(mapComment);
+        setComments((prev) => (append ? [...prev, ...mapped] : mapped));
+        const pages = res.pagination?.pages || 1;
+        setHasMore(targetPage < pages);
+        setPage(targetPage);
+      } catch (e) {
+        setError(e.message || "Failed to load comments");
+      } finally {
+        if (append) {
+          setLoadingMore(false);
+        } else {
+          setLoadingInitial(false);
+        }
+        setRefreshing(false);
+      }
+    },
+    [travel?.id, mapComment, filterType]
+  );
 
   useEffect(() => {
-    // Simulate loading comments
-    setIsLoading(true);
-    setTimeout(() => {
-      setComments([
+    loadComments(1, false);
+  }, [loadComments]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadComments(1, false);
+  };
+
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMore) return;
+    loadComments(page + 1, true);
+  };
+
+  const handleSend = async () => {
+    if (newComment.trim() === "" || sending) return;
+    try {
+      setSending(true);
+      const optimistic = {
+        id: `temp-${Date.now()}`,
+        userId: String(user?.id || "me"),
+        userName: user?.name || user?.phone || t("you"),
+        content: newComment,
+        type: "PRE_TRAVEL",
+        createdAt: new Date().toISOString(),
+        likes: 0,
+        isLiked: false,
+        avatar: AVATAR_PLACEHOLDER,
+        canDelete: true,
+        optimistic: true,
+      };
+      setComments((prev) => [optimistic, ...prev]);
+      const creationType =
+        filterType === "POST_TRAVEL" ? "POST_TRAVEL" : "PRE_TRAVEL";
+      const res = await createComment(travel.id, {
+        content: newComment,
+        type: creationType,
+      });
+      const real = mapComment(res.data);
+      setComments((prev) =>
+        prev.map((c) => (c.id === optimistic.id ? real : c))
+      );
+      setNewComment("");
+      Keyboard.dismiss();
+    } catch (e) {
+      setError(e.message || "Failed to post comment");
+      // rollback optimistic
+      setComments((prev) => prev.filter((c) => !c.optimistic));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleToggleLike = async (comment) => {
+    try {
+      if (comment.isLiked) {
+        const res = await unlikeComment(comment.id);
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === comment.id
+              ? { ...c, isLiked: false, likes: res.data.likesCount }
+              : c
+          )
+        );
+      } else {
+        const res = await likeComment(comment.id);
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === comment.id
+              ? { ...c, isLiked: true, likes: res.data.likesCount }
+              : c
+          )
+        );
+      }
+    } catch (e) {
+      setError(e.message || "Failed to toggle like");
+    }
+  };
+
+  const confirmDelete = (comment) => {
+    Alert.alert(
+      t("confirm_delete_title") || "Delete Comment",
+      t("confirm_delete_message") ||
+        "Are you sure you want to delete this comment?",
+      [
+        { text: t("cancel") || "Cancel", style: "cancel" },
         {
-          id: "1",
-          userId: "user1",
-          userName: "John Traveler",
-          content: t("comment_question"),
-          type: "PRE_TRAVEL",
-          createdAt: "2023-10-15T14:30:00Z",
+          text: t("delete") || "Delete",
+          style: "destructive",
+          onPress: () => handleDelete(comment),
         },
-        {
-          id: "2",
-          userId: "admin",
-          userName: "Travel Support",
-          content: t("comment_answer"),
-          type: "PRE_TRAVEL",
-          createdAt: "2023-10-15T16:45:00Z",
-        },
-      ]);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+      ]
+    );
+  };
 
-  const handleSend = () => {
-    if (newComment.trim() === "") return;
-
-    const newCommentObj = {
-      id: Date.now().toString(),
-      userId: "currentUser",
-      userName: "You",
-      content: newComment,
-      type: "PRE_TRAVEL",
-      createdAt: new Date().toISOString(),
-    };
-
-    setComments([...comments, newCommentObj]);
-    setNewComment("");
-    Keyboard.dismiss();
+  const handleDelete = async (comment) => {
+    try {
+      await deleteComment(comment.id);
+      setComments((prev) => prev.filter((c) => c.id !== comment.id));
+    } catch (e) {
+      setError(e.message || "Failed to delete comment");
+    }
   };
 
   const formatDate = (dateString) => {
@@ -71,36 +209,151 @@ const CommentScreen = ({ route }) => {
     });
   };
 
-  const renderComment = ({ item }) => (
-    <View
-      style={[
-        styles.commentContainer,
-        item.userId === "currentUser" ? styles.myComment : styles.otherComment,
-        isRTL && styles.rtlComment,
-      ]}
-    >
-      <Text style={styles.userName}>{item.userName}</Text>
-      <Text style={styles.commentText}>{item.content}</Text>
-      <Text style={styles.commentDate}>{formatDate(item.createdAt)}</Text>
-    </View>
-  );
+  const renderComment = ({ item }) => {
+    return (
+      <View
+        style={[
+          styles.commentContainer,
+          item.userId === String(user?.id)
+            ? styles.myComment
+            : styles.otherComment,
+          isRTL && styles.rtlComment,
+        ]}
+      >
+        <View style={styles.commentHeader}>
+          <View style={styles.avatarContainer}>
+            <Image source={{ uri: item.avatar }} style={styles.avatar} />
+          </View>
+          <View style={styles.commentMeta}>
+            <Text style={styles.userName}>{item.userName}</Text>
+            <Text style={styles.commentDate}>{formatDate(item.createdAt)}</Text>
+          </View>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={styles.likeButton}
+              onPress={() => handleToggleLike(item)}
+              disabled={item.optimistic}
+            >
+              <Text style={[styles.likeText, item.isLiked && styles.liked]}>
+                {item.isLiked ? "♥" : "♡"} {item.likes}
+              </Text>
+            </TouchableOpacity>
+            {item.canDelete && !item.optimistic && (
+              <TouchableOpacity
+                style={styles.deleteButton}
+                onPress={() => confirmDelete(item)}
+              >
+                <Text style={styles.deleteText}>×</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+        <Text style={styles.commentText}>{item.content}</Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
+      {error && <Text style={styles.errorText}>{error}</Text>}
       <FlatList
         data={comments}
         keyExtractor={(item) => item.id}
         renderItem={renderComment}
         contentContainerStyle={styles.commentsList}
-        inverted={comments.length > 0}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>{t("no_comments")}</Text>
-            <Text style={styles.emptySubtext}>{t("be_first_comment")}</Text>
+        ListHeaderComponent={
+          <View style={styles.headerWrapper}>
+            <View style={styles.travelHeader}>
+              {travel?.imageUrl ? (
+                <Image
+                  source={{ uri: resolveImageUrl(travel.imageUrl) }}
+                  style={styles.travelImage}
+                />
+              ) : null}
+              <View style={styles.travelMeta}>
+                <Text style={styles.travelTitle}>{travel?.title}</Text>
+                {travel?.startDate && travel?.endDate ? (
+                  <Text style={styles.travelDates}>
+                    {new Date(travel.startDate).toLocaleDateString()} - {""}
+                    {new Date(travel.endDate).toLocaleDateString()}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <View style={styles.segmentContainer}>
+              {[
+                { key: "all", label: t("all") || "All" },
+                { key: "PRE_TRAVEL", label: t("pre_travel") || "Pre" },
+                { key: "POST_TRAVEL", label: t("post_travel") || "Post" },
+              ].map((seg) => (
+                <TouchableOpacity
+                  key={seg.key}
+                  style={[
+                    styles.segmentButton,
+                    filterType === seg.key && styles.segmentButtonActive,
+                  ]}
+                  onPress={() => {
+                    if (filterType !== seg.key) {
+                      setFilterType(seg.key);
+                      setPage(1);
+                      loadComments(1, false);
+                    }
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      filterType === seg.key && styles.segmentTextActive,
+                    ]}
+                  >
+                    {seg.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
+        onEndReachedThreshold={0.2}
+        onEndReached={handleLoadMore}
+        ListEmptyComponent={
+          loadingInitial ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator color={theme.colors.primary} />
+              <Text style={styles.emptySubtext}>{t("loading")}</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>{t("no_comments")}</Text>
+              <Text style={styles.emptySubtext}>{t("be_first_comment")}</Text>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator color={theme.colors.primary} />
+            </View>
+          ) : hasMore ? (
+            <TouchableOpacity
+              style={styles.loadMoreButton}
+              onPress={handleLoadMore}
+            >
+              <Text style={styles.loadMoreText}>{t("load_more")}</Text>
+            </TouchableOpacity>
+          ) : comments.length > 0 ? (
+            <View style={styles.endTextWrapper}>
+              <Text style={styles.endText}>{t("no_more_comments")}</Text>
+            </View>
+          ) : null
+        }
       />
-
       <View style={styles.inputContainer}>
         <TextInput
           style={[styles.input, isRTL && styles.rtlInput]}
@@ -110,11 +363,16 @@ const CommentScreen = ({ route }) => {
           multiline
         />
         <TouchableOpacity
-          style={styles.sendButton}
+          style={[
+            styles.sendButton,
+            (newComment.trim() === "" || sending) && styles.sendDisabled,
+          ]}
           onPress={handleSend}
-          disabled={newComment.trim() === ""}
+          disabled={newComment.trim() === "" || sending}
         >
-          <Text style={styles.sendButtonText}>{t("send")}</Text>
+          <Text style={styles.sendButtonText}>
+            {sending ? t("sending") : t("send")}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -130,11 +388,69 @@ const styles = StyleSheet.create({
     padding: theme.spacing.m,
     paddingBottom: 70,
   },
+  headerWrapper: {
+    marginBottom: theme.spacing.m,
+  },
+  travelHeader: {
+    flexDirection: "row",
+    marginBottom: theme.spacing.s,
+    alignItems: "center",
+  },
+  travelImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: theme.spacing.m,
+    backgroundColor: theme.colors.light,
+  },
+  travelMeta: {
+    flex: 1,
+  },
+  travelTitle: {
+    fontSize: theme.fontSize.large,
+    fontWeight: "600",
+    color: theme.colors.dark,
+    ...(isRTL && { textAlign: "right" }),
+  },
+  travelDates: {
+    fontSize: theme.fontSize.small,
+    color: theme.colors.gray,
+    marginTop: 2,
+    ...(isRTL && { textAlign: "right" }),
+  },
+  segmentContainer: {
+    flexDirection: "row",
+    backgroundColor: theme.colors.light,
+    borderRadius: 24,
+    padding: 4,
+    alignSelf: "flex-start",
+  },
+  segmentButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  segmentButtonActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  segmentText: {
+    fontSize: theme.fontSize.small,
+    color: theme.colors.gray,
+    fontWeight: "500",
+  },
+  segmentTextActive: {
+    color: theme.colors.white,
+  },
   commentContainer: {
     maxWidth: "80%",
     padding: theme.spacing.m,
     borderRadius: theme.borderRadius.medium,
     marginBottom: theme.spacing.m,
+    backgroundColor: theme.colors.white,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   myComment: {
     backgroundColor: theme.colors.primaryLight,
@@ -156,6 +472,54 @@ const styles = StyleSheet.create({
     color: theme.colors.dark,
     marginBottom: theme.spacing.xs,
     ...(isRTL && { textAlign: "right" }),
+  },
+  commentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: theme.spacing.xs,
+  },
+  avatarContainer: {
+    marginRight: theme.spacing.s,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.light,
+  },
+  commentMeta: {
+    flex: 1,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: theme.spacing.s,
+  },
+  likeButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+    backgroundColor: theme.colors.light,
+    marginRight: theme.spacing.xs,
+  },
+  likeText: {
+    fontSize: theme.fontSize.small,
+    color: theme.colors.gray,
+  },
+  liked: {
+    color: theme.colors.danger,
+    fontWeight: "600",
+  },
+  deleteButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    backgroundColor: theme.colors.light,
+  },
+  deleteText: {
+    color: theme.colors.gray,
+    fontSize: theme.fontSize.medium,
+    fontWeight: "600",
   },
   commentText: {
     color: theme.colors.dark,
@@ -212,11 +576,47 @@ const styles = StyleSheet.create({
     marginLeft: isRTL ? 0 : theme.spacing.s,
     marginRight: isRTL ? theme.spacing.s : 0,
     padding: theme.spacing.s,
+    minWidth: 80,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.borderRadius.medium,
+    backgroundColor: theme.colors.primaryLight,
+  },
+  sendDisabled: {
+    opacity: 0.5,
   },
   sendButtonText: {
     color: theme.colors.primary,
     fontWeight: "bold",
     fontSize: theme.fontSize.medium,
+  },
+  errorText: {
+    color: theme.colors.danger,
+    textAlign: "center",
+    marginTop: theme.spacing.s,
+  },
+  footerLoader: {
+    paddingVertical: theme.spacing.m,
+  },
+  loadMoreButton: {
+    alignSelf: "center",
+    paddingHorizontal: theme.spacing.l,
+    paddingVertical: theme.spacing.s,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 24,
+    marginVertical: theme.spacing.s,
+  },
+  loadMoreText: {
+    color: theme.colors.white,
+    fontWeight: "600",
+  },
+  endTextWrapper: {
+    alignItems: "center",
+    paddingVertical: theme.spacing.s,
+  },
+  endText: {
+    fontSize: theme.fontSize.small,
+    color: theme.colors.gray,
   },
 });
 

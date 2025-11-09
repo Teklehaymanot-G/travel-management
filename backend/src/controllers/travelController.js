@@ -1,6 +1,7 @@
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const path = require("path");
+const { buildImageUrl } = require("../config/imageHost");
 
 // Get all travels with filters
 const getTravels = async (req, res, next) => {
@@ -20,7 +21,7 @@ const getTravels = async (req, res, next) => {
       ];
     }
 
-    const travels = await prisma.travel.findMany({
+    const travelsRaw = await prisma.travel.findMany({
       where,
       include: {
         createdBy: {
@@ -44,6 +45,16 @@ const getTravels = async (req, res, next) => {
       },
     });
 
+    // Map imageUrl to absolute if stored as relative
+    const travels = travelsRaw.map((t) => ({
+      ...t,
+      imageUrl: /^https?:\/\//i.test(t.imageUrl || "")
+        ? t.imageUrl
+        : t.imageUrl
+        ? buildImageUrl(req, t.imageUrl)
+        : null,
+    }));
+
     const total = await prisma.travel.count({ where });
 
     res.json({
@@ -66,7 +77,7 @@ const getTravel = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const travel = await prisma.travel.findUnique({
+    const travelRaw = await prisma.travel.findUnique({
       where: { id: parseInt(id) },
       include: {
         createdBy: {
@@ -105,6 +116,17 @@ const getTravel = async (req, res, next) => {
       },
     });
 
+    const travel = travelRaw
+      ? {
+          ...travelRaw,
+          imageUrl: /^https?:\/\//i.test(travelRaw.imageUrl || "")
+            ? travelRaw.imageUrl
+            : travelRaw.imageUrl
+            ? buildImageUrl(req, travelRaw.imageUrl)
+            : null,
+        }
+      : null;
+
     if (!travel) {
       return res.status(404).json({ message: "Travel not found" });
     }
@@ -135,9 +157,19 @@ const createTravel = async (req, res, next) => {
     let imageUrl;
     if (req.file) {
       const rel = `/uploads/travels/${req.file.filename}`;
-      imageUrl = `${req.protocol}://${req.get("host")}${rel}`;
+      imageUrl = `${rel}`;
     } else if (req.body.imageUrl) {
       imageUrl = req.body.imageUrl; // fallback support
+    }
+
+    // Store only relative path (without host) to avoid stale IPs; if absolute provided strip protocol/host
+    let storedImageUrl = imageUrl;
+    if (storedImageUrl) {
+      const absMatch = storedImageUrl.match(/^https?:\/\/[^/]+\/(.*)$/i);
+      if (absMatch) {
+        storedImageUrl = absMatch[1];
+      }
+      storedImageUrl = storedImageUrl.replace(/^\/+/, ""); // remove leading slash
     }
 
     const travel = await prisma.travel.create({
@@ -147,7 +179,7 @@ const createTravel = async (req, res, next) => {
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         price: parseFloat(price),
-        imageUrl,
+        imageUrl: storedImageUrl, // relative path only (e.g. uploads/travels/file.jpg)
         itinerary,
         requirements,
         status: "PLANNED", // force default status on creation
@@ -169,6 +201,7 @@ const createTravel = async (req, res, next) => {
       data: travel,
     });
   } catch (error) {
+    console.log(error);
     next(error);
   }
 };
@@ -188,6 +221,13 @@ const updateTravel = async (req, res, next) => {
       status,
     } = req.body;
 
+    let incomingImageUrl = req.body.imageUrl;
+    if (incomingImageUrl) {
+      const absMatch = incomingImageUrl.match(/^https?:\/\/[^/]+\/(.*)$/i);
+      if (absMatch) incomingImageUrl = absMatch[1];
+      incomingImageUrl = incomingImageUrl.replace(/^\/+/, "");
+    }
+
     const travel = await prisma.travel.update({
       where: { id: parseInt(id) },
       data: {
@@ -196,7 +236,7 @@ const updateTravel = async (req, res, next) => {
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
         price: price ? parseFloat(price) : undefined,
-        imageUrl: req.body.imageUrl,
+        imageUrl: incomingImageUrl || undefined,
         itinerary,
         requirements,
         status, // allow explicit status changes only via update
@@ -230,15 +270,20 @@ const uploadTravelImage = async (req, res, next) => {
       return res.status(400).json({ message: "No image file uploaded" });
     }
 
-    const rel = `/uploads/travels/${req.file.filename}`;
-    const imageUrl = `${req.protocol}://${req.get("host")}${rel}`;
-
+    const rel = `uploads/travels/${req.file.filename}`; // store relative path
     const travel = await prisma.travel.update({
       where: { id: parseInt(id) },
-      data: { imageUrl },
+      data: { imageUrl: rel },
     });
 
-    res.json({ success: true, data: travel });
+    // Return absolute URL using centralized host builder
+    res.json({
+      success: true,
+      data: {
+        ...travel,
+        imageUrl: buildImageUrl(req, travel.imageUrl),
+      },
+    });
   } catch (error) {
     next(error);
   }

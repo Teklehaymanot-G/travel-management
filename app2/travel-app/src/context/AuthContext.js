@@ -1,6 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Alert } from "react-native";
+import { API_URL } from "../utils/constants";
+
+function makeFetch(url, options = {}, { timeoutMs = 10000 } = {}) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(id)
+  );
+}
 
 const AuthContext = createContext();
 
@@ -42,15 +51,29 @@ export const AuthProvider = ({ children }) => {
   const requestOTP = async (phone) => {
     try {
       setIsLoading(true);
-
-      // Simulate API call to request OTP
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Mock success response
+      const res = await makeFetch(`${API_URL}/auth/register/request-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to send OTP");
+      }
+      const data = await res.json();
+      // Optionally log devCode during development
+      if (data.devCode) console.log("DEV OTP:", data.devCode);
       return true;
     } catch (error) {
       console.error("OTP request failed:", error);
-      Alert.alert("Error", "Failed to send OTP. Please try again.");
+      const hint = API_URL.includes("localhost")
+        ? " (Set EXPO_PUBLIC_API_URL to http://<LAN_IP>:5000/api)"
+        : "";
+      const msg =
+        error.name === "AbortError"
+          ? "Request timed out. Check network/Wi‑Fi."
+          : error.message || "Failed to send OTP.";
+      Alert.alert("Network Error", msg + hint);
       return false;
     } finally {
       setIsLoading(false);
@@ -58,58 +81,58 @@ export const AuthProvider = ({ children }) => {
   };
 
   // In your AuthContext
-  const verifyOTP = async (phone, otp) => {
+  const verifyOTP = async (phone, otp, options = {}) => {
     try {
-      // setLoadingAction("verifying");
-
-      // Simulate API call to verify OTP
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Mock verification
-      if (otp === "123456") {
-        const userData = {
-          id: "1",
-          phone,
-          name: "Travel User",
-          email: "user@example.com",
-        };
-
-        setUser(userData);
-        setIsAuthenticated(true);
-
-        // Store auth data
-        await AsyncStorage.setItem("userToken", "mock-jwt-token");
-        await AsyncStorage.setItem("userData", JSON.stringify(userData));
-
-        return true;
-      } else {
-        Alert.alert(
-          "Invalid OTP",
-          "Please enter the correct verification code."
-        );
-        return false;
+      setIsLoading(true);
+      const res = await makeFetch(`${API_URL}/auth/register/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, code: otp, name: options.name }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Invalid OTP");
       }
+      const data = await res.json();
+      const { token, user } = data;
+      setUser(user);
+      setIsAuthenticated(true);
+      await AsyncStorage.setItem("userToken", token);
+      await AsyncStorage.setItem("userData", JSON.stringify(user));
+      return true;
     } catch (error) {
       console.error("OTP verification failed:", error);
-      Alert.alert("Error", "Failed to verify OTP. Please try again.");
+      const msg =
+        error.name === "AbortError"
+          ? "Request timed out. Check network/Wi‑Fi."
+          : error.message || "Failed to verify OTP.";
+      Alert.alert("Network Error", msg);
       return false;
     } finally {
-      // setLoadingAction(null);
+      setIsLoading(false);
     }
   };
 
   const resendOTP = async (phone) => {
     try {
       setIsLoading(true);
-
-      // Simulate API call to resend OTP
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      console.log("OTP resent to:", phone);
+      const res = await makeFetch(`${API_URL}/auth/register/request-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to resend OTP");
+      }
       return true;
     } catch (error) {
       console.error("Resend OTP failed:", error);
-      Alert.alert("Error", "Failed to resend OTP. Please try again.");
+      const msg =
+        error.name === "AbortError"
+          ? "Request timed out. Check network/Wi‑Fi."
+          : error.message || "Failed to resend OTP.";
+      Alert.alert("Network Error", msg);
       return false;
     } finally {
       setIsLoading(false);

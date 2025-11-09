@@ -9,6 +9,9 @@ export default {
     gray: "#95a5a6",
     white: "#ffffff",
     black: "#000000",
+    primaryLight: "#e6f2fb",
+    surface: "#ffffff",
+    border: "#dfe6e9",
   },
   spacing: {
     xs: 4,

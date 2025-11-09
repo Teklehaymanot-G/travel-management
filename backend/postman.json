@@ -21,7 +21,7 @@
       "name": "Authentication",
       "item": [
         {
-          "name": "Register User",
+          "name": "Request Register OTP",
           "request": {
             "method": "POST",
             "header": [
@@ -32,12 +32,51 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"+251911223344\",\n  \"password\": \"password123\",\n  \"name\": \"John Traveler\",\n  \"role\": \"TRAVELER\"\n}"
+              "raw": "{\n  \"phone\": \"+251911223344\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/auth/register",
+              "raw": "{{baseUrl}}/auth/register/request-otp",
               "host": ["{{baseUrl}}"],
-              "path": ["auth", "register"]
+              "path": ["auth", "register", "request-otp"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Register OTP (Create Account)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Stores authToken on success', function () {",
+                  "  if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('token');",
+                  "    pm.collectionVariables.set('authToken', json.token);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+251911223344\",\n  \"code\": \"123456\",\n  \"name\": \"John Traveler\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register", "verify-otp"]
             }
           },
           "response": []
@@ -54,7 +93,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"+251911223344\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"phone\": \"+251911223344\",\n  \"password\": \"ignored-in-dev\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",

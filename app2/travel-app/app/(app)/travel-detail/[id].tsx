@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { t } from "i18next";
-import React, { useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   FlatList,
   Image,
@@ -15,118 +15,133 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
+  KeyboardAvoidingView,
+  Alert,
 } from "react-native";
+import { fetchTravel } from "@/src/services/travelService";
+import {
+  fetchComments,
+  createComment,
+  likeComment,
+  unlikeComment,
+  deleteComment,
+} from "@/src/services/commentService";
+import { resolveImageUrl } from "@/src/utils/image";
+import { useAuth } from "@/src/context/AuthContext";
 
-type TravelKey = keyof typeof travelData;
+const PLACEHOLDER =
+  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200";
 
-const travelData = {
-  "1": {
-    id: "1",
-    title: "Lalibela Rock-Hewn Churches",
-    location: "Lalibela, Ethiopia",
-    price: 450,
-    duration: "3 days",
-    rating: 4.8,
-    reviews: 1247,
-    description:
-      "Explore the magnificent rock-hewn churches of Lalibela, a UNESCO World Heritage site and one of the most important pilgrimage sites for Ethiopian Orthodox Christians.",
-    images: [
-      "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?w=800",
-      "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800",
-    ],
-    highlights: [
-      "Visit 11 medieval monolithic cave churches",
-      "Experience traditional Ethiopian Orthodox ceremonies",
-      "Explore the underground tunnels and passages",
-      "Enjoy panoramic views of the Lasta Mountains",
-    ],
-    included: [
-      "Accommodation in 4-star hotel",
-      "All transportation",
-      "Professional guide",
-      "Entrance fees",
-      "Breakfast and dinner",
-    ],
-  },
-  "2": {
-    id: "2",
-    title: "Danakil Depression Adventure",
-    location: "Afar Region, Ethiopia",
-    price: 680,
-    duration: "4 days",
-    rating: 4.9,
-    reviews: 892,
-    description:
-      "Journey to one of the hottest places on Earth and witness the otherworldly landscapes of salt flats, volcanic formations, and colorful hydrothermal fields.",
-    images: [
-      "https://images.unsplash.com/photo-1559666126-84f389727b9a?w=800",
-      "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800",
-    ],
-    highlights: [
-      "Walk on the salt flats of Lake Asale",
-      "See the active volcano Erta Ale",
-      "Visit the colorful Dallol hydrothermal field",
-      "Experience Afar culture and traditions",
-    ],
-    included: [
-      "Camping equipment",
-      "4WD transportation",
-      "Experienced guide and scouts",
-      "All meals included",
-      "Safety equipment",
-    ],
-  },
-};
-
-const sampleComments = [
-  {
-    id: "1",
-    userId: "user1",
-    userName: "John Traveler",
-    content:
-      "This trip looks amazing! I've been dreaming of visiting Lalibela for years. Can you tell me more about the accommodation?",
-    type: "PRE_TRAVEL",
-    createdAt: "2024-01-15T14:30:00Z",
-    userAvatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150",
-    likes: 5,
-    isLiked: false,
-  },
-  {
-    id: "2",
-    userId: "admin",
-    userName: "Travel Support Team",
-    content:
-      "Hi John! The accommodation is at a beautiful 4-star hotel with stunning mountain views. All rooms have private bathrooms and hot water. Would you like more specific details?",
-    type: "PRE_TRAVEL",
-    createdAt: "2024-01-15T16:45:00Z",
-    userAvatar:
-      "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150",
-    likes: 3,
-    isLiked: true,
-  },
-  {
-    id: "3",
-    userId: "user2",
-    userName: "Sarah Adventure",
-    content:
-      "I took this trip last month and it was absolutely incredible! The rock-hewn churches are even more impressive in person. Our guide was very knowledgeable.",
-    type: "POST_TRAVEL",
-    createdAt: "2024-01-14T09:20:00Z",
-    userAvatar:
-      "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150",
-    likes: 12,
-    isLiked: true,
-  },
-];
+// Comments now loaded from backend. Sample removed.
 
 export default function TravelDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const travel = travelData[id as TravelKey];
+  const [travel, setTravel] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showComments, setShowComments] = useState(false);
-  const [comments, setComments] = useState<any[]>(sampleComments);
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState<boolean>(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
+  const { user } = useAuth();
+
+  // Pagination state
+  const [commentPage, setCommentPage] = useState(1);
+  const [commentLimit] = useState(20);
+  const [commentHasMore, setCommentHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setError(null);
+        setLoading(true);
+        const res = await fetchTravel(id);
+        setTravel(res?.data || null);
+      } catch (e: any) {
+        setError(e?.message || "Failed to load travel");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (id) load();
+  }, [id]);
+
+  // Map API comment to view model
+  const mapComment = useCallback(
+    (c: any) => ({
+      id: String(c.id),
+      userId: String(c.traveler?.id || c.travelerId || ""),
+      userName: c.traveler?.name || c.traveler?.phone || "Traveler",
+      content: c.content,
+      type: c.type,
+      createdAt: c.createdAt,
+      userAvatar: c.traveler?.avatarUrl
+        ? resolveImageUrl(c.traveler.avatarUrl)
+        : null,
+      likes: c.likesCount || 0,
+      isLiked: !!c.likedByMe,
+    }),
+    []
+  );
+
+  const loadComments = useCallback(
+    async (pageToLoad = 1, append = false) => {
+      if (!id) return;
+      try {
+        if (!append) setCommentError(null);
+        if (!append) setCommentsLoading(true);
+        else setLoadingMore(true);
+        const res = await fetchComments(id as string, {
+          page: pageToLoad,
+          limit: commentLimit,
+        });
+        const mapped = (res.data || []).map(mapComment);
+        setComments((prev) => (append ? [...prev, ...mapped] : mapped));
+        const pages = res.pagination?.pages || 1;
+        setCommentHasMore(pageToLoad < pages);
+        setCommentPage(pageToLoad);
+      } catch (e: any) {
+        setCommentError(e.message || "Failed to load comments");
+      } finally {
+        if (!append) setCommentsLoading(false);
+        else setLoadingMore(false);
+      }
+    },
+    [id, commentLimit, mapComment]
+  );
+
+  // Initial comments load / reset when toggling visibility
+  useEffect(() => {
+    if (showComments) {
+      setCommentPage(1);
+      loadComments(1, false);
+    }
+  }, [showComments, loadComments]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || !commentHasMore) return;
+    loadComments(commentPage + 1, true);
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{t("loading")}...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
   if (!travel) {
     return (
@@ -150,23 +165,19 @@ export default function TravelDetailScreen() {
     router.push(`/booking/${travel.id}`);
   };
 
-  const handleSendComment = () => {
+  const handleSendComment = async () => {
     if (newComment.trim() === "") return;
-
-    const newCommentObj = {
-      id: Date.now().toString(),
-      userId: "currentUser",
-      userName: "You",
-      content: newComment,
-      type: "PRE_TRAVEL",
-      createdAt: new Date().toISOString(),
-      likes: 0,
-      isLiked: false,
-    };
-
-    setComments([...comments, newCommentObj]);
-    setNewComment("");
-    Keyboard.dismiss();
+    try {
+      const res = await createComment(id as string, { content: newComment });
+      const c = res.data;
+      const mapped = mapComment(c);
+      // Insert at start since API returns newest first (desc order)
+      setComments((prev) => [mapped, ...prev]);
+      setNewComment("");
+      Keyboard.dismiss();
+    } catch (e: any) {
+      setCommentError(e.message || "Failed to post comment");
+    }
   };
 
   const formatDate = (dateString: any) => {
@@ -176,11 +187,64 @@ export default function TravelDetailScreen() {
     });
   };
 
+  const handleToggleLike = async (comment: any) => {
+    try {
+      if (comment.isLiked) {
+        const res = await unlikeComment(comment.id);
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === comment.id
+              ? { ...c, isLiked: false, likes: res.data.likesCount }
+              : c
+          )
+        );
+      } else {
+        const res = await likeComment(comment.id);
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === comment.id
+              ? { ...c, isLiked: true, likes: res.data.likesCount }
+              : c
+          )
+        );
+      }
+    } catch (e: any) {
+      setCommentError(e.message || "Failed to toggle like");
+    }
+  };
+
+  const actuallyDeleteComment = async (comment: any) => {
+    try {
+      await deleteComment(comment.id);
+      setComments((prev) => prev.filter((c) => c.id !== comment.id));
+    } catch (e: any) {
+      setCommentError(e.message || "Failed to delete comment");
+    }
+  };
+
+  const handleDeleteComment = (comment: any) => {
+    Alert.alert(
+      t("confirm_delete_title") || "Delete Comment",
+      t("confirm_delete_message") ||
+        "Are you sure you want to delete this comment?",
+      [
+        { text: t("cancel") || "Cancel", style: "cancel" },
+        {
+          text: t("delete") || "Delete",
+          style: "destructive",
+          onPress: () => actuallyDeleteComment(comment),
+        },
+      ]
+    );
+  };
+
   const renderComment = ({ item }: any) => (
     <View
       style={[
         styles.commentContainer,
-        item.userId === "currentUser" ? styles.myComment : styles.otherComment,
+        item.userId === String(user?.id)
+          ? styles.myComment
+          : styles.otherComment,
       ]}
     >
       <View style={styles.commentHeader}>
@@ -203,19 +267,29 @@ export default function TravelDetailScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.likeButton}
-          onPress={() => handleLike(item.id)}
-        >
-          <Ionicons
-            name={item.isLiked ? "heart" : "heart-outline"}
-            size={16}
-            color={item.isLiked ? "#e53e3e" : "#718096"}
-          />
-          <Text style={[styles.likeCount, item.isLiked && styles.likedCount]}>
-            {item.likes}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <TouchableOpacity
+            style={styles.likeButton}
+            onPress={() => handleToggleLike(item)}
+          >
+            <Ionicons
+              name={item.isLiked ? "heart" : "heart-outline"}
+              size={16}
+              color={item.isLiked ? "#e53e3e" : "#718096"}
+            />
+            <Text style={[styles.likeCount, item.isLiked && styles.likedCount]}>
+              {item.likes}
+            </Text>
+          </TouchableOpacity>
+          {item.userId === String(user?.id) && (
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteComment(item)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#718096" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <Text style={styles.commentText}>{item.content}</Text>
@@ -232,260 +306,224 @@ export default function TravelDetailScreen() {
     </View>
   );
 
-  const handleLike = (commentId: string) => {
-    setComments((prevComments) =>
-      prevComments.map((comment) =>
-        comment.id === commentId
-          ? {
-              ...comment,
-              isLiked: !comment.isLiked,
-              likes: comment.isLiked ? comment.likes - 1 : comment.likes + 1,
-            }
-          : comment
-      )
-    );
-  };
+  // Legacy placeholder removed; real like/unlike implemented.
+
+  console.log("travel", resolveImageUrl(travel.imageUrl));
 
   return (
-    <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: travel.images[0] }}
-            style={styles.mainImage}
-            resizeMode="cover"
-          />
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+    >
+      <View style={styles.container}>
+        {!showComments && (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Ionicons name="arrow-back" size={24} color="#1a202c" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.commentButton}
-            onPress={() => setShowComments(!showComments)}
-          >
-            <Ionicons name="chatbubble-outline" size={20} color="#667eea" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-            <Ionicons name="share-outline" size={24} color="#1a202c" />
-          </TouchableOpacity>
-        </View>
+            <View style={styles.imageContainer}>
+              <Image
+                source={{
+                  uri: resolveImageUrl(travel.imageUrl) || PLACEHOLDER,
+                }}
+                style={styles.mainImage}
+                resizeMode="cover"
+              />
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.back()}
+              >
+                <Ionicons name="arrow-back" size={24} color="#1a202c" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.commentButton}
+                onPress={() => setShowComments(!showComments)}
+              >
+                <Ionicons name="chatbubble-outline" size={20} color="#667eea" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={handleShare}
+              >
+                <Ionicons name="share-outline" size={24} color="#1a202c" />
+              </TouchableOpacity>
+            </View>
 
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={styles.titleContainer}>
-              <Text style={styles.title}>{travel.title}</Text>
-              {/* <Text style={styles.location}>
+            <View style={styles.content}>
+              <View style={styles.header}>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.title}>{travel.title}</Text>
+                  {/* <Text style={styles.location}>
                 <Ionicons name="location-outline" size={16} color="#718096" />
                 {travel.location}
               </Text> */}
-              <Text style={styles.duration}>{travel.duration}</Text>
-            </View>
-            {/* <View style={styles.ratingContainer}>
+                  {travel.startDate && travel.endDate ? (
+                    <Text style={styles.duration}>
+                      {new Date(travel.startDate).toLocaleDateString()} -{" "}
+                      {new Date(travel.endDate).toLocaleDateString()}
+                    </Text>
+                  ) : null}
+                </View>
+                {/* <View style={styles.ratingContainer}>
               <Ionicons name="star" size={20} color="#f6ad55" />
               <Text style={styles.rating}>{travel.rating}</Text>
               <Text style={styles.reviews}>
                 ({travel.reviews} {t("reviews")})
               </Text>
             </View> */}
-          </View>
+              </View>
 
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}>
-              {travel.price} {t("br")}
-            </Text>
-            <Text style={styles.perPerson}>{t("per_person")}</Text>
-            {/* <Text style={styles.duration}>{travel.duration}</Text> */}
-          </View>
+              <View style={styles.priceContainer}>
+                <Text style={styles.price}>
+                  {travel.price} {t("br")}
+                </Text>
+                <Text style={styles.perPerson}>{t("per_person")}</Text>
+                {/* <Text style={styles.duration}>{travel.duration}</Text> */}
+              </View>
 
-          {!showComments && (
-            <Text style={styles.description}>{travel.description}</Text>
-          )}
+              {!showComments && (
+                <Text style={styles.description}>{travel.description}</Text>
+              )}
 
-          {!showComments && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t("trip_highlights")}</Text>
-              {travel.highlights.map(
-                (
-                  highlight:
-                    | string
-                    | number
-                    | bigint
-                    | boolean
-                    | React.ReactElement<
-                        unknown,
-                        string | React.JSXElementConstructor<any>
-                      >
-                    | Iterable<React.ReactNode>
-                    | React.ReactPortal
-                    | Promise<
-                        | string
-                        | number
-                        | bigint
-                        | boolean
-                        | React.ReactPortal
-                        | React.ReactElement<
-                            unknown,
-                            string | React.JSXElementConstructor<any>
-                          >
-                        | Iterable<React.ReactNode>
-                        | null
-                        | undefined
-                      >
-                    | null
-                    | undefined,
-                  index: React.Key | null | undefined
-                ) => (
-                  <View key={index} style={styles.highlightItem}>
+              {/* Itinerary */}
+              {!showComments && travel.itinerary && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>{t("itinerary")}</Text>
+                  <Text style={styles.includedText}>{travel.itinerary}</Text>
+                </View>
+              )}
+
+              {!showComments && travel.requirements && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>{t("requirements")}</Text>
+                  <Text style={styles.includedText}>{travel.requirements}</Text>
+                </View>
+              )}
+
+              {!showComments && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>
+                    {t("important_notes")}
+                  </Text>
+                  <View style={styles.noteItem}>
                     <Ionicons
-                      name="checkmark-circle"
+                      name="information-circle-outline"
                       size={20}
-                      color="#48bb78"
+                      color="#ed8936"
                     />
-                    <Text style={styles.highlightText}>{highlight}</Text>
-                  </View>
-                )
-              )}
-            </View>
-          )}
-
-          {!showComments && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t("whats_included")}</Text>
-              {travel.included.map(
-                (
-                  item:
-                    | string
-                    | number
-                    | bigint
-                    | boolean
-                    | React.ReactElement<
-                        unknown,
-                        string | React.JSXElementConstructor<any>
-                      >
-                    | Iterable<React.ReactNode>
-                    | React.ReactPortal
-                    | Promise<
-                        | string
-                        | number
-                        | bigint
-                        | boolean
-                        | React.ReactPortal
-                        | React.ReactElement<
-                            unknown,
-                            string | React.JSXElementConstructor<any>
-                          >
-                        | Iterable<React.ReactNode>
-                        | null
-                        | undefined
-                      >
-                    | null
-                    | undefined,
-                  index: React.Key | null | undefined
-                ) => (
-                  <View key={index} style={styles.includedItem}>
-                    <Ionicons name="checkmark" size={16} color="#667eea" />
-                    <Text style={styles.includedText}>{item}</Text>
-                  </View>
-                )
-              )}
-            </View>
-          )}
-
-          {!showComments && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t("important_notes")}</Text>
-              <View style={styles.noteItem}>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={20}
-                  color="#ed8936"
-                />
-                <Text style={styles.noteText}>
-                  {t("booking_confirmation_note")}
-                </Text>
-              </View>
-              <View style={styles.noteItem}>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={20}
-                  color="#ed8936"
-                />
-                <Text style={styles.noteText}>
-                  {t("cancellation_policy_note")}
-                </Text>
-              </View>
-            </View>
-          )}
-          {/* Full Comments Section */}
-          {showComments && (
-            <View style={styles.fullCommentsSection}>
-              <View style={styles.commentsHeader}>
-                <Text style={styles.sectionTitle}>
-                  {t("comments")} ({comments.length})
-                </Text>
-                <TouchableOpacity onPress={() => setShowComments(false)}>
-                  <Ionicons name="close" size={24} color="#718096" />
-                </TouchableOpacity>
-              </View>
-
-              <FlatList
-                data={comments}
-                keyExtractor={(item) => item.id}
-                renderItem={renderComment}
-                contentContainerStyle={styles.commentsList}
-                scrollEnabled={false}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>{t("no_comments")}</Text>
-                    <Text style={styles.emptySubtext}>
-                      {t("be_first_comment")}
+                    <Text style={styles.noteText}>
+                      {t("booking_confirmation_note")}
                     </Text>
                   </View>
-                }
-              />
-
-              {/* Comment Input */}
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={[styles.input]}
-                  placeholder={t("write_comment")}
-                  value={newComment}
-                  onChangeText={setNewComment}
-                  multiline
-                />
-                <TouchableOpacity
-                  style={styles.sendButton}
-                  onPress={handleSendComment}
-                  disabled={newComment.trim() === ""}
-                >
-                  <Text style={styles.sendButtonText}>{t("send")}</Text>
-                </TouchableOpacity>
-              </View>
+                  <View style={styles.noteItem}>
+                    <Ionicons
+                      name="information-circle-outline"
+                      size={20}
+                      color="#ed8936"
+                    />
+                    <Text style={styles.noteText}>
+                      {t("cancellation_policy_note")}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
-          )}
-        </View>
-      </ScrollView>
+          </ScrollView>
+        )}
+        {showComments && (
+          <View style={styles.fullCommentsSection}>
+            <View style={styles.commentsHeader}>
+              <Text style={styles.sectionTitle}>
+                {t("comments")} ({comments.length})
+              </Text>
+              <TouchableOpacity onPress={() => setShowComments(false)}>
+                <Ionicons name="close" size={24} color="#718096" />
+              </TouchableOpacity>
+            </View>
+            {commentError && (
+              <Text style={styles.errorTextSmall}>{commentError}</Text>
+            )}
+            <FlatList
+              data={comments}
+              keyExtractor={(item) => item.id}
+              renderItem={renderComment}
+              contentContainerStyle={styles.commentsList}
+              onEndReachedThreshold={0.2}
+              onEndReached={handleLoadMore}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>{t("no_comments")}</Text>
+                  <Text style={styles.emptySubtext}>
+                    {t("be_first_comment")}
+                  </Text>
+                </View>
+              }
+              ListFooterComponent={
+                commentsLoading ? (
+                  <Text style={styles.loadingText}>{t("loading")}...</Text>
+                ) : commentHasMore ? (
+                  <View style={styles.loadMoreContainer}>
+                    {loadingMore ? (
+                      <Text style={styles.loadingText}>{t("loading")}...</Text>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.loadMoreButton}
+                        onPress={handleLoadMore}
+                      >
+                        <Text style={styles.loadMoreText}>
+                          {t("load_more") || "Load More"}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ) : comments.length > 0 ? (
+                  <View style={styles.endOfListContainer}>
+                    <Text style={styles.endOfListText}>
+                      {t("no_more_comments") || "No more comments"}
+                    </Text>
+                  </View>
+                ) : null
+              }
+            />
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[styles.input]}
+                placeholder={t("write_comment")}
+                value={newComment}
+                onChangeText={setNewComment}
+                multiline
+              />
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={handleSendComment}
+                disabled={newComment.trim() === ""}
+              >
+                <Text style={styles.sendButtonText}>{t("send")}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
-      <View style={styles.footer}>
-        <View style={styles.priceFooter}>
-          <Text style={styles.totalPrice}>
-            {travel.price} {t("br")}
-          </Text>
-          <Text style={styles.totalLabel}>{t("total_per_person")}</Text>
-        </View>
+        <View style={styles.footer}>
+          <View style={styles.priceFooter}>
+            <Text style={styles.totalPrice}>
+              {travel.price} {t("br")}
+            </Text>
+            <Text style={styles.totalLabel}>{t("total_per_person")}</Text>
+          </View>
 
-        <AppButton
-          title={t("book_now")}
-          onPress={handleBookNow}
-          style={styles.bookButton}
-          gradient={["#667eea", "#764ba2"]}
-          icon="arrow-forward"
-          textStyle={undefined}
-        />
+          <AppButton
+            title={t("book_now")}
+            onPress={handleBookNow}
+            style={styles.bookButton}
+            gradient={["#667eea", "#764ba2"]}
+            icon="arrow-forward"
+            textStyle={undefined}
+          />
+        </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -504,6 +542,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#718096",
     textAlign: "center",
+  },
+  errorTextSmall: {
+    fontSize: 14,
+    color: "#e53e3e",
+    marginBottom: 8,
   },
   imageContainer: {
     position: "relative",
@@ -552,6 +595,11 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#718096",
+    marginBottom: 8,
   },
   header: {
     flexDirection: "row",
@@ -921,6 +969,34 @@ const styles = StyleSheet.create({
   likedCount: {
     color: "#e53e3e",
     fontWeight: "600",
+  },
+  deleteButton: {
+    marginLeft: 8,
+    padding: 6,
+    borderRadius: 6,
+    backgroundColor: "#f7fafc",
+  },
+  loadMoreContainer: {
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  loadMoreButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#667eea",
+    borderRadius: 24,
+  },
+  loadMoreText: {
+    color: "#ffffff",
+    fontWeight: "600",
+  },
+  endOfListContainer: {
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  endOfListText: {
+    fontSize: 12,
+    color: "#a0aec0",
   },
   // commentText: {
   //   fontSize: 15,

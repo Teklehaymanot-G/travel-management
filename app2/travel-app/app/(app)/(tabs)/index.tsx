@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  ActivityIndicator,
   Image,
   RefreshControl,
   ScrollView,
@@ -12,68 +13,21 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { fetchTravels } from "@/src/services/travelService";
+import { resolveImageUrl } from "@/src/utils/image";
 
-const travelDestinations = [
-  {
-    id: "1",
-    title: "Lalibela Rock-Hewn Churches",
-    location: "Lalibela, Ethiopia",
-    price: 450,
-    rating: 4.8,
-    image: "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?w=300",
-    duration: "3 days",
-  },
-  {
-    id: "2",
-    title: "Danakil Depression Adventure",
-    location: "Afar Region, Ethiopia",
-    price: 680,
-    rating: 4.9,
-    image: "https://images.unsplash.com/photo-1559666126-84f389727b9a?w=300",
-    duration: "4 days",
-  },
-  {
-    id: "3",
-    title: "Simien Mountains Trek",
-    location: "Simien Mountains, Ethiopia",
-    price: 520,
-    rating: 4.7,
-    image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300",
-    duration: "5 days",
-  },
-  {
-    id: "4",
-    title: "Blue Nile Falls",
-    location: "Bahir Dar, Ethiopia",
-    price: 320,
-    rating: 4.5,
-    image: "https://images.unsplash.com/photo-1560264280-88f9318fdead?w=300",
-    duration: "2 days",
-  },
-  {
-    id: "5",
-    title: "Simien Mountains Trek",
-    location: "Simien Mountains, Ethiopia",
-    price: 520,
-    rating: 4.7,
-    image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300",
-    duration: "5 days",
-  },
-  {
-    id: "6",
-    title: "Blue Nile Falls",
-    location: "Bahir Dar, Ethiopia",
-    price: 320,
-    rating: 4.5,
-    image: "https://images.unsplash.com/photo-1560264280-88f9318fdead?w=300",
-    duration: "2 days",
-  },
-];
+const PLACEHOLDER =
+  "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=600";
 
 export default function DiscoverScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [travels, setTravels] = useState<any[]>([]);
+  const [hasMore, setHasMore] = useState(true);
   // const [selectedCategory, setSelectedCategory] = useState("all");
 
   // const categories = [
@@ -83,12 +37,63 @@ export default function DiscoverScreen() {
   //   { id: "cultural", name: t("cultural"), icon: "landmark" },
   // ];
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 2000);
+  const loadTravels = async (reset = false) => {
+    try {
+      if (reset) {
+        setPage(1);
+      }
+      setError(null);
+      if (reset) setLoading(true);
+      // Fetch ONGOING and COMPLETED only
+      const currentPage = reset ? 1 : page;
+      const [ongoingRes, completedRes] = await Promise.all([
+        fetchTravels({ page: currentPage, limit: 10, status: "ONGOING" }),
+        fetchTravels({ page: currentPage, limit: 10, status: "COMPLETED" }),
+      ]);
+
+      const items = [
+        ...(ongoingRes?.data || []),
+        ...(completedRes?.data || []),
+      ];
+      // Sort combined by createdAt desc if present, else by startDate desc
+      items.sort((a: any, b: any) => {
+        const aDate = a.createdAt || a.startDate || 0;
+        const bDate = b.createdAt || b.startDate || 0;
+        return new Date(bDate).getTime() - new Date(aDate).getTime();
+      });
+
+      const totalPages = Math.max(
+        ongoingRes?.pagination?.pages || 1,
+        completedRes?.pagination?.pages || 1
+      );
+      setTravels((prev) => (reset ? items : [...prev, ...items]));
+      setHasMore(currentPage < totalPages);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load travels");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const handleTravelPress = (travelId: string) => {
+  useEffect(() => {
+    loadTravels(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (page > 1) {
+      loadTravels(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadTravels(true);
+  };
+
+  const handleTravelPress = (travelId: string | number) => {
     router.push(`/(app)/travel-detail/${travelId}`);
   };
 
@@ -148,15 +153,54 @@ export default function DiscoverScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.travelList}
       >
-        <View style={styles.travelGrid}>
-          {travelDestinations.map((travel) => (
+        {loading && travels.length === 0 ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#667eea" />
+          </View>
+        ) : null}
+        {error && !loading ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity
-              key={travel.id}
+              style={styles.retryBtn}
+              onPress={() => loadTravels(true)}
+            >
+              <Text style={styles.retryText}>{t("retry")}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        {!loading && !error && travels.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="airplane-outline" size={36} color="#667eea" />
+            </View>
+            <Text style={styles.emptyTitle}>
+              {t("no_travels_title", { defaultValue: "No trips yet" })}
+            </Text>
+            <Text style={styles.emptyText}>
+              {t("no_travels_message", {
+                defaultValue:
+                  "New adventures will appear here. Try refreshing or check back later.",
+              })}
+            </Text>
+            <TouchableOpacity style={styles.emptyBtn} onPress={onRefresh}>
+              <Text style={styles.emptyBtnText}>
+                {t("refresh", { defaultValue: "Refresh" })}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        <View style={styles.travelGrid}>
+          {travels.map((travel) => (
+            <TouchableOpacity
+              key={String(travel.id)}
               style={styles.travelCard}
               onPress={() => handleTravelPress(travel.id)}
             >
               <Image
-                source={{ uri: travel.image }}
+                source={{
+                  uri: resolveImageUrl(travel.imageUrl) || PLACEHOLDER,
+                }}
                 style={styles.travelImage}
                 resizeMode="cover"
               />
@@ -171,7 +215,13 @@ export default function DiscoverScreen() {
                   <View style={styles.travelDetail}>
                     <Ionicons name="time-outline" size={14} color="#718096" />
                     <Text style={styles.travelDetailText}>
-                      {travel.duration}
+                      {travel.startDate && travel.endDate
+                        ? `${new Date(
+                            travel.startDate
+                          ).toLocaleDateString()} - ${new Date(
+                            travel.endDate
+                          ).toLocaleDateString()}`
+                        : t("planned")}
                     </Text>
                   </View>
                   {/* <View style={styles.travelDetail}>
@@ -190,6 +240,14 @@ export default function DiscoverScreen() {
             </TouchableOpacity>
           ))}
         </View>
+        {!loading && hasMore && (
+          <TouchableOpacity
+            style={styles.loadMoreBtn}
+            onPress={() => setPage((p) => p + 1)}
+          >
+            <Text style={styles.loadMoreText}>{t("load_more")}</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </View>
   );
@@ -257,10 +315,73 @@ const styles = StyleSheet.create({
   travelList: {
     padding: 16,
   },
+  loadingWrap: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  errorBox: {
+    backgroundColor: "#fff5f5",
+    borderColor: "#fed7d7",
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  errorText: {
+    color: "#c53030",
+    fontSize: 14,
+  },
+  retryBtn: {
+    marginTop: 8,
+    paddingVertical: 8,
+  },
+  retryText: {
+    color: "#667eea",
+    fontWeight: "600",
+  },
   travelGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+  },
+  emptyWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 8,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#eef2ff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1a202c",
+    marginTop: 4,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#4a5568",
+    textAlign: "center",
+    paddingHorizontal: 16,
+    marginTop: 2,
+  },
+  emptyBtn: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#667eea",
+    borderRadius: 10,
+  },
+  emptyBtnText: {
+    color: "#ffffff",
+    fontWeight: "600",
   },
   travelCard: {
     width: "48%",
@@ -325,5 +446,14 @@ const styles = StyleSheet.create({
   travelPriceLabel: {
     fontSize: 10,
     color: "#718096",
+  },
+  loadMoreBtn: {
+    marginTop: 8,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  loadMoreText: {
+    color: "#667eea",
+    fontWeight: "600",
   },
 });
