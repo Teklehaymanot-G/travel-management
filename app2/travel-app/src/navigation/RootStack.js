@@ -3,6 +3,7 @@ import LoginScreen from "../screens/auth/LoginScreen";
 import OTPVerificationScreen from "../screens/auth/OTPVerificationScreen";
 import BookingConfirmationScreen from "../screens/booking/BookingConfirmationScreen.js";
 import BookingScreen from "../screens/booking/BookingScreen";
+import PaymentScreen from "../screens/booking/PaymentScreen";
 import MyTicketsScreen from "../screens/booking/MyTicketsScreen";
 import CommentScreen from "../screens/comments/CommentScreen";
 import DocumentViewerScreen from "../screens/documents/DocumentViewerScreen";
@@ -25,6 +26,7 @@ const RootStack = () => {
       <Stack.Screen name="TravelDetail" component={TravelDetailScreen} />
       <Stack.Screen name="Comment" component={CommentScreen} />
       <Stack.Screen name="Booking" component={BookingScreen} />
+      <Stack.Screen name="Payment" component={PaymentScreen} />
       <Stack.Screen
         name="BookingConfirmation"
         component={BookingConfirmationScreen}

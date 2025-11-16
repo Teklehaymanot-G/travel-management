@@ -10,6 +10,7 @@ import {
 import * as Yup from "yup";
 // import TravelerForm from "../../components/booking/TravelerForm";
 import AppButton from "../../components/common/AppButton.js";
+import { createBooking } from "../../services/bookingService";
 import theme from "../../config/theme";
 
 const validationSchema = Yup.object().shape({
@@ -27,12 +28,25 @@ const validationSchema = Yup.object().shape({
 const BookingScreen = ({ route, navigation }) => {
   const { travel } = route.params;
   const [travelerCount, setTravelerCount] = useState(1);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const handleSubmit = (values) => {
-    navigation.navigate("BookingConfirmation", {
-      travel,
-      travelers: values.travelers,
-    });
+  const handleSubmit = async (values) => {
+    setErrorMessage("");
+    try {
+      const res = await createBooking({
+        travelId: travel.id,
+        travelers: values.travelers,
+      });
+      const booking = res?.data || res;
+      if (!booking?.id) {
+        throw new Error("Booking failed");
+      }
+      navigation.navigate("Payment", { booking });
+    } catch (e) {
+      setErrorMessage(
+        e.message || "Failed to create booking. Please login and retry."
+      );
+    }
   };
 
   const initialValues = {
@@ -102,6 +116,9 @@ const BookingScreen = ({ route, navigation }) => {
               </View>
             </View>
 
+            {errorMessage ? (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            ) : null}
             <AppButton
               title="Continue to Payment"
               onPress={handleSubmit}

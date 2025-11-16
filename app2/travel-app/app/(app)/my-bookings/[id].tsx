@@ -14,7 +14,7 @@ import {
 } from "react-native";
 // Removed duplicate import of useLocalSearchParams/useRouter
 import { getMyBookings } from "@/src/services/bookingService";
-import { createPayment } from "@/src/services/paymentService";
+import { createPayment, validateCoupon } from "@/src/services/paymentService";
 import { getBanks } from "@/src/services/bankService";
 import { Ionicons } from "@expo/vector-icons";
 // DateTimePicker dynamically imported; ensure dependency installed
@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTranslation } from "react-i18next";
 import * as ImagePicker from "expo-image-picker";
+import Constants from "expo-constants";
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -40,6 +41,11 @@ export default function BookingDetailScreen() {
   const [receipt, setReceipt] = useState<any | null>(null);
   const [banks, setBanks] = useState<any[]>([]);
   const [bankLoading, setBankLoading] = useState(false);
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [couponInfo, setCouponInfo] = useState<any | null>(null);
+  const [couponError, setCouponError] = useState<string>("");
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
   // Date picker could be implemented with a modal; keep flag if needed later.
 
   const load = useCallback(async () => {
@@ -96,15 +102,41 @@ export default function BookingDetailScreen() {
     }
   }, [paymentDate]);
 
-  const amount = useMemo(() => {
-    if (!booking?.travel) return 0;
-    const count = Array.isArray(booking.participants)
-      ? booking.participants.length
+  const participantsCount = useMemo(() => {
+    return Array.isArray(booking?.participants)
+      ? Math.max(1, booking.participants.length)
       : 1;
-    const subtotal = (booking.travel.price || 0) * count;
-    const tax = subtotal * 0.1;
-    return subtotal + tax;
   }, [booking]);
+
+  const unitPrice = booking?.travel?.price || 0;
+  const baseAmount = useMemo(
+    () => unitPrice * participantsCount,
+    [unitPrice, participantsCount]
+  );
+  const discountAmount = couponInfo?.data?.discountAmount ?? 0;
+  const finalAmount = couponInfo?.data?.finalAmount ?? baseAmount;
+
+  const onApplyCoupon = async () => {
+    setCouponError("");
+    setApplyingCoupon(true);
+    try {
+      if (!couponCode?.trim()) {
+        setCouponError(t("enter_coupon_code") || "Enter coupon code");
+        return;
+      }
+      const res = await validateCoupon({
+        code: couponCode.trim(),
+        amount: unitPrice,
+        participants: participantsCount,
+      });
+      setCouponInfo(res);
+    } catch (e: any) {
+      setCouponInfo(null);
+      setCouponError(e?.message || t("invalid_coupon") || "Invalid coupon");
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
 
   const pickReceipt = async () => {
     try {
@@ -181,6 +213,7 @@ export default function BookingDetailScreen() {
         transactionNumber,
         bank,
         paymentDate,
+        couponCode: couponInfo?.data?.code || couponCode?.trim() || undefined,
       };
       await createPayment(payload);
       Alert.alert(
@@ -196,6 +229,40 @@ export default function BookingDetailScreen() {
     } finally {
       setSubmitting(false);
     }
+  };
+  const resolveImageUrl = (raw: any) => {
+    // console.log(raw);
+    if (!raw || (typeof raw === "string" && !raw.trim())) return null;
+    const normalized = String(raw).replace(/\\/g, "/"); // handle Windows backslashes
+    if (/^https?:\/\//i.test(normalized)) return normalized; // already absolute
+    // Strip query/hash early (not expected but safe)
+    const withoutQuery = normalized.split(/[?#]/)[0];
+    // Normalize leading slashes and ./
+    const cleaned = withoutQuery.replace(/^\.\/+/, "").replace(/^\/+/, "");
+    // Remove accidental leading "uploads/" duplication (e.g., uploads/uploads/travels/...)
+    const deduped = cleaned.replace(/^uploads\/uploads\//, "uploads/");
+    // Ensure begins with uploads/
+    const path = deduped.startsWith("uploads/")
+      ? deduped
+      : `uploads/${deduped}`;
+    const envBase =
+      (process?.env as any)?.EXPO_PUBLIC_API_URL ||
+      (Constants?.expoConfig?.extra as any)?.API_URL ||
+      (Constants?.expoConfig?.extra as any)?.apiUrl ||
+      "http://localhost:5000/api";
+    const base = String(envBase).replace(/\/$/, "");
+    const root = base.endsWith("/api") ? base.slice(0, -4) : base;
+    const resolved = `${root}/${path}`;
+    if (__DEV__) {
+      console.debug("[TravelCard] resolveImageUrl", {
+        raw,
+        normalized,
+        cleaned,
+        deduped,
+        resolved,
+      });
+    }
+    return resolved;
   };
 
   if (loading) {
@@ -289,10 +356,72 @@ export default function BookingDetailScreen() {
               {t("add_payment") || "Add Payment"}
             </Text>
             <Text style={styles.muted}>
-              {t("amount") || "Amount"}: ${amount.toFixed(2)} (
-              {t("readonly") || "read-only"})
+              {t("participants") || "Participants"}: {participantsCount}
             </Text>
+            <View style={{ height: 6 }} />
+            <View style={styles.rowBetween}>
+              <Text style={styles.muted}>{t("amount") || "Amount"}</Text>
+              <Text style={styles.itemText}>${baseAmount.toFixed(2)}</Text>
+            </View>
+            <View style={styles.rowBetween}>
+              <Text style={styles.muted}>{t("discount") || "Discount"}</Text>
+              <Text style={[styles.itemText, { color: "#667eea" }]}>
+                {discountAmount
+                  ? `- $${Number(discountAmount).toFixed(2)}`
+                  : "—"}
+              </Text>
+            </View>
+            <View style={[styles.rowBetween, { marginTop: 4 }]}>
+              <Text style={[styles.itemText, { fontWeight: "700" }]}>
+                {t("total") || "Total"}
+              </Text>
+              <Text
+                style={[
+                  styles.itemText,
+                  { color: "#2b6cb0", fontWeight: "700" },
+                ]}
+              >
+                ${Number(finalAmount).toFixed(2)}
+              </Text>
+            </View>
             <View style={{ height: 12 }} />
+
+            {/* Coupon */}
+            <Text style={styles.label}>{t("coupon") || "Coupon"}</Text>
+            <View
+              style={{ flexDirection: "row", gap: 8, alignItems: "center" }}
+            >
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder={t("enter_coupon_code") || "Enter coupon code"}
+                value={couponCode}
+                autoCapitalize="characters"
+                onChangeText={setCouponCode}
+              />
+              <TouchableOpacity
+                onPress={onApplyCoupon}
+                disabled={applyingCoupon}
+                style={[
+                  styles.uploadButton,
+                  { borderColor: applyingCoupon ? "#cbd5e0" : "#667eea" },
+                ]}
+              >
+                <Text style={[styles.uploadText, { marginLeft: 0 }]}>
+                  {t("apply") || "Apply"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {couponError ? (
+              <Text style={{ color: "#e53e3e", marginTop: 6 }}>
+                {couponError}
+              </Text>
+            ) : null}
+            {couponInfo?.data?.code ? (
+              <Text style={{ color: "#2f855a", marginTop: 6 }}>
+                {(t("coupon_applied") || "Coupon applied") + ": "}
+                {couponInfo.data.code}
+              </Text>
+            ) : null}
 
             <Text style={styles.label}>{t("bank") || "Bank"}</Text>
             <ScrollView
@@ -320,7 +449,8 @@ export default function BookingDetailScreen() {
                     >
                       {b.logoUrl ? (
                         <Image
-                          source={{ uri: b.logoUrl }}
+                          source={{ uri: resolveImageUrl(b.logoUrl) }}
+                          // source={{ uri: b.logoUrl }}
                           style={styles.bankLogo}
                         />
                       ) : null}

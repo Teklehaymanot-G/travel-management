@@ -13,6 +13,7 @@ export async function createPayment({
   transactionNumber,
   bank,
   paymentDate,
+  couponCode,
 }) {
   const headers = {
     "Content-Type": "application/json",
@@ -27,11 +28,32 @@ export async function createPayment({
       transactionNumber,
       bank,
       paymentDate,
+      couponCode,
     }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || "Failed to submit payment");
+  }
+  return res.json();
+}
+
+// Validate a coupon with optional base amount and participant count
+export async function validateCoupon({ code, amount, participants = 1 }) {
+  const headers = {
+    ...(await getAuthHeader()),
+  };
+  const params = new URLSearchParams();
+  if (code) params.append("code", code);
+  if (amount != null) params.append("amount", String(amount));
+  if (participants != null) params.append("participants", String(participants));
+  const res = await fetch(`${API_URL}/coupons/validate?${params.toString()}`, {
+    method: "GET",
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || "Failed to validate coupon");
   }
   return res.json();
 }

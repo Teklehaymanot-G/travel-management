@@ -84,12 +84,21 @@ const getPayments = async (req, res, next) => {
 // Create payment (or resubmit if previously rejected)
 const createPayment = async (req, res, next) => {
   try {
-    const { bookingId, receiptUrl, transactionNumber, bank, paymentDate } =
-      req.body;
+    const {
+      bookingId,
+      receiptUrl,
+      transactionNumber,
+      bank,
+      paymentDate,
+      couponCode,
+    } = req.body;
 
     // Check if booking exists
     const booking = await prisma.booking.findUnique({
       where: { id: parseInt(bookingId) },
+      include: {
+        travel: { select: { price: true, title: true, id: true } },
+      },
     });
 
     if (!booking) {
@@ -99,6 +108,56 @@ const createPayment = async (req, res, next) => {
     // Check if user owns the booking
     if (booking.travelerId !== req.user.id) {
       return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Compute base/original amount from travel price and participants count if available
+    let participantsCount = 1;
+    try {
+      const fresh = await prisma.booking.findUnique({
+        where: { id: parseInt(bookingId) },
+        select: { participants: true },
+      });
+      if (fresh?.participants && Array.isArray(fresh.participants)) {
+        participantsCount = Math.max(1, fresh.participants.length);
+      }
+    } catch {}
+    const originalAmount = booking?.travel?.price
+      ? Number(booking.travel.price) * participantsCount
+      : null;
+
+    // Validate coupon if provided
+    let appliedCouponCode = null;
+    let discountAmount = null;
+    if (
+      couponCode &&
+      typeof couponCode === "string" &&
+      couponCode.trim().length > 0
+    ) {
+      const code = couponCode.trim();
+      const coupon = await prisma.coupon.findUnique({ where: { code } });
+      if (!coupon) return res.status(400).json({ message: "Invalid coupon" });
+      const now = new Date();
+      if (!coupon.active)
+        return res.status(400).json({ message: "Coupon inactive" });
+      if (coupon.validFrom > now)
+        return res.status(400).json({ message: "Coupon not yet valid" });
+      if (coupon.validTo < now)
+        return res.status(400).json({ message: "Coupon expired" });
+      if (coupon.maxUses && coupon.used >= coupon.maxUses)
+        return res.status(400).json({ message: "Coupon usage limit reached" });
+      if (originalAmount === null)
+        return res
+          .status(400)
+          .json({ message: "Cannot compute base amount for discount" });
+      if (coupon.type === "PERCENT") {
+        discountAmount = Math.min(
+          originalAmount,
+          Math.round((originalAmount * coupon.discount) / 100)
+        );
+      } else {
+        discountAmount = Math.min(originalAmount, coupon.discount);
+      }
+      appliedCouponCode = code;
     }
 
     // If payment exists and was rejected, allow resubmission via update; otherwise prevent duplicates
@@ -131,6 +190,14 @@ const createPayment = async (req, res, next) => {
           status: "PENDING",
           approvedById: null,
           rejectionMessage: null,
+          // Replace coupon and amount values on resubmit
+          couponCode: appliedCouponCode || null,
+          originalAmount: originalAmount ?? existing.originalAmount ?? null,
+          discountAmount: discountAmount ?? existing.discountAmount ?? null,
+          finalAmount:
+            originalAmount != null
+              ? originalAmount - (discountAmount || 0)
+              : existing.finalAmount ?? null,
         },
         include: {
           booking: {
@@ -148,6 +215,13 @@ const createPayment = async (req, res, next) => {
           transactionNumber: transactionNumber || null,
           bank: bank || null,
           paymentDate: paymentDate ? new Date(paymentDate) : null,
+          couponCode: appliedCouponCode || null,
+          originalAmount: originalAmount,
+          discountAmount: discountAmount,
+          finalAmount:
+            originalAmount != null
+              ? originalAmount - (discountAmount || 0)
+              : null,
         },
         include: {
           booking: {
@@ -210,6 +284,18 @@ const updatePaymentStatus = async (req, res, next) => {
         where: { id: payment.bookingId },
         data: { status: "APPROVED" },
       });
+
+      // Increment coupon usage if applied
+      if (payment.couponCode) {
+        try {
+          await prisma.coupon.update({
+            where: { code: payment.couponCode },
+            data: { used: { increment: 1 } },
+          });
+        } catch (e) {
+          // ignore
+        }
+      }
 
       // Generate tickets if none exist yet
       const existingTickets = payment.booking.tickets || [];

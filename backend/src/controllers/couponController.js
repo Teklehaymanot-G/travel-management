@@ -180,4 +180,54 @@ module.exports = {
   updateCoupon,
   deleteCoupon,
   toggleActive,
+  validateCoupon,
 };
+
+// GET /api/coupons/validate?code=XYZ&amount=100&participants=2
+async function validateCoupon(req, res, next) {
+  try {
+    const { code, amount, participants = 1 } = req.query;
+    if (!code)
+      return res.status(400).json({ message: "code query param required" });
+    const coupon = await prisma.coupon.findUnique({ where: { code } });
+    if (!coupon) return res.status(404).json({ message: "Coupon not found" });
+    const now = new Date();
+    if (!coupon.active)
+      return res.status(400).json({ message: "Coupon inactive" });
+    if (coupon.validFrom > now)
+      return res.status(400).json({ message: "Coupon not yet valid" });
+    if (coupon.validTo < now)
+      return res.status(400).json({ message: "Coupon expired" });
+    if (coupon.maxUses && coupon.used >= coupon.maxUses) {
+      return res.status(400).json({ message: "Coupon usage limit reached" });
+    }
+    const baseAmount = amount ? parseFloat(amount) : null;
+    let discountAmount = null;
+    if (baseAmount !== null && !Number.isNaN(baseAmount)) {
+      const totalBase = baseAmount * parseInt(participants);
+      if (coupon.type === "PERCENT") {
+        discountAmount = Math.min(
+          totalBase,
+          Math.round((totalBase * coupon.discount) / 100)
+        );
+      } else {
+        discountAmount = Math.min(totalBase, coupon.discount);
+      }
+      return res.json({
+        success: true,
+        data: {
+          code: coupon.code,
+          type: coupon.type.toLowerCase(),
+          discount: coupon.discount,
+          discountAmount,
+          originalAmount: totalBase,
+          finalAmount: totalBase - discountAmount,
+        },
+      });
+    }
+    // If amount not provided just return coupon metadata
+    res.json({ success: true, data: serialize(coupon) });
+  } catch (err) {
+    next(err);
+  }
+}

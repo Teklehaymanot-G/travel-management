@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import AppButton from "../../components/common/AppButton.js";
+import { getMyBookings } from "../../services/bookingService";
 import theme from "../../config/theme";
 import { isRTL } from "../../utils/rtl";
 
@@ -14,6 +15,35 @@ const BookingConfirmationScreen = ({ route, navigation }) => {
   const { t } = useTranslation();
   const { travel, travelers } = route.params;
   const totalPrice = travel.price * travelers.length;
+  const [loadingPaymentLookup, setLoadingPaymentLookup] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+
+  const handleProceedToPayment = async () => {
+    setLookupError("");
+    setLoadingPaymentLookup(true);
+    try {
+      // Fetch user's bookings and find the latest pending booking without payment for this travel
+      const res = await getMyBookings({ page: 1, limit: 20, status: "all" });
+      const bookings = res?.data || [];
+      const candidates = bookings.filter(
+        (b) => b.travel?.id === travel.id && (!b.payment || b.payment === null)
+      );
+      // Sort by createdAt descending
+      candidates.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const booking = candidates[0];
+      if (!booking) {
+        setLookupError(
+          t("no_bookings_yet") || "No pending booking found for this travel"
+        );
+      } else {
+        navigation.navigate("Payment", { booking });
+      }
+    } catch (e) {
+      setLookupError(e.message || "Failed to locate booking");
+    } finally {
+      setLoadingPaymentLookup(false);
+    }
+  };
 
   return (
     <ScrollView
@@ -80,6 +110,15 @@ const BookingConfirmationScreen = ({ route, navigation }) => {
           onPress={() => navigation.navigate("MyTickets")}
           style={styles.button}
         />
+        <AppButton
+          title={t("continue_payment") || "Continue to Payment"}
+          onPress={handleProceedToPayment}
+          style={styles.button}
+          disabled={loadingPaymentLookup}
+        />
+        {lookupError ? (
+          <Text style={styles.errorText}>{lookupError}</Text>
+        ) : null}
         <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => navigation.navigate("TravelDetail", { travel })}
@@ -192,6 +231,11 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     fontSize: theme.fontSize.medium,
     fontWeight: "bold",
+  },
+  errorText: {
+    color: theme.colors.danger || "#cc0000",
+    marginTop: theme.spacing.s,
+    textAlign: "center",
   },
 });
 

@@ -87,6 +87,10 @@ model Payment {
   approvedBy  User?       @relation(fields: [approvedById], references: [id])
   approvedById Int?
   rejectionMessage String?
+  couponCode  String?    // applied coupon code (immutable after approval)
+  discountAmount Float?  // numeric discount applied
+  originalAmount Float?  // base amount before discount (travel.price * participants count)
+  finalAmount   Float?   // originalAmount - discountAmount
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }

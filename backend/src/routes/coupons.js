@@ -8,6 +8,7 @@ const controller = require("../controllers/couponController");
 router.use(auth);
 
 router.get("/", controller.listCoupons);
+router.get("/validate", controller.validateCoupon);
 router.post("/", controller.createCoupon);
 router.put("/:id", controller.updateCoupon);
 router.delete("/:id", controller.deleteCoupon);

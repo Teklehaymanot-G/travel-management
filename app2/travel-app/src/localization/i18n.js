@@ -317,6 +317,15 @@ const resources = {
       payment: "Payment",
       ticket: "Ticket",
       created_at: "Created At",
+      // Coupon & discount
+      coupon: "Coupon",
+      discount: "Discount",
+      apply: "Apply",
+      enter_coupon_code: "Enter coupon code",
+      coupon_applied: "Coupon applied",
+      invalid_coupon: "Invalid coupon",
+      payment_submit_error: "Failed to submit payment",
+      summary: "Summary",
     },
   },
   am: {
@@ -599,6 +608,15 @@ const resources = {
       payment: "ክፍያ",
       ticket: "ትኬት",
       created_at: "የተፈጠረበት ጊዜ",
+      // ኩፖን እና ቅናሽ
+      coupon: "ኩፖን",
+      discount: "ቅናሽ",
+      apply: "አተግብር",
+      enter_coupon_code: "የኩፖን ኮድ ያስገቡ",
+      coupon_applied: "ኩፖኑ ተተግብሯል",
+      invalid_coupon: "ማለት የማይቻል ኩፖን",
+      payment_submit_error: "ክፍያ ማስገባት አልተሳካም",
+      summary: "ማጠቃለያ",
     },
   },
 };
