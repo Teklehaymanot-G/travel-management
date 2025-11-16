@@ -2,8 +2,9 @@
 // import { useAuth } from "@/context/AuthContext";
 import LoadingIndicator from "@/src/components/common/LoadingIndicator";
 import { useAuth } from "@/src/context/AuthContext";
+import { getMyBookings, cancelBooking } from "@/src/services/bookingService";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Image,
@@ -15,57 +16,52 @@ import {
   View,
 } from "react-native";
 
-const tickets = [
-  {
-    id: "1",
-    destination: "Lalibela, Ethiopia",
-    date: "2024-02-15",
-    price: "$450",
-    status: "confirmed",
-    image: "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?w=300",
-  },
-  {
-    id: "2",
-    destination: "Danakil Depression",
-    date: "2024-03-20",
-    price: "$680",
-    status: "upcoming",
-    image: "https://images.unsplash.com/photo-1559666126-84f389727b9a?w=300",
-  },
-  {
-    id: "3",
-    destination: "Simien Mountains",
-    date: "2024-01-10",
-    price: "$520",
-    status: "completed",
-    image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=300",
-  },
-];
+// Live data replaces static sample
 
 export default function MyTicketsScreen() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("all"); // all | PENDING | APPROVED | REJECTED
+  const [bookings, setBookings] = useState<any[]>([]);
+
+  const load = async (status: string, isRefresh = false) => {
+    try {
+      if (!isRefresh) setLoading(true);
+      setError(null);
+      const params: any = {};
+      if (status !== "all") params.status = status;
+      const res = await getMyBookings(params);
+      setBookings(res?.data || []);
+    } catch (e: any) {
+      setError(e.message || "Failed to load bookings");
+    } finally {
+      if (!isRefresh) setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) load(activeTab);
+  }, [user, activeTab]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 2000);
+    load(activeTab, true);
   };
 
-  const filteredTickets = tickets.filter((ticket) => {
-    if (activeTab === "all") return true;
-    return ticket.status === activeTab;
-  });
+  const filteredBookings = bookings; // server already filtered by status
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "confirmed":
+      case "APPROVED":
         return "#48bb78";
-      case "upcoming":
+      case "PENDING":
         return "#ed8936";
-      case "completed":
-        return "#4299e1";
+      case "REJECTED":
+        return "#e53e3e";
       default:
         return "#a0aec0";
     }
@@ -73,16 +69,26 @@ export default function MyTicketsScreen() {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "confirmed":
-        return t("confirmed");
-      case "upcoming":
-        return t("upcoming");
-      case "completed":
-        return t("completed");
+      case "APPROVED":
+        return t("approved");
+      case "PENDING":
+        return t("pending");
+      case "REJECTED":
+        return t("rejected");
       default:
         return status;
     }
   };
+
+  if (!user) {
+    return (
+      <LoadingIndicator
+        text={t("loading_tickets")}
+        color={undefined}
+        style={undefined}
+      />
+    );
+  }
 
   if (!user) {
     return (
@@ -102,7 +108,7 @@ export default function MyTicketsScreen() {
       </View>
 
       <View style={styles.tabContainer}>
-        {["all", "upcoming", "confirmed", "completed"].map((tab) => (
+        {["all", "PENDING", "APPROVED", "REJECTED"].map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -114,7 +120,7 @@ export default function MyTicketsScreen() {
                 activeTab === tab && styles.activeTabText,
               ]}
             >
-              {t(tab)}
+              {t(tab.toLowerCase())}
             </Text>
           </TouchableOpacity>
         ))}
@@ -127,7 +133,18 @@ export default function MyTicketsScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {filteredTickets.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="time-outline" size={48} color="#cbd5e0" />
+            <Text style={styles.emptyStateText}>{t("loading")}</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="alert-circle-outline" size={48} color="#e53e3e" />
+            <Text style={styles.emptyStateTitle}>{t("error")}</Text>
+            <Text style={styles.emptyStateText}>{error}</Text>
+          </View>
+        ) : filteredBookings.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="ticket-outline" size={64} color="#cbd5e0" />
             <Text style={styles.emptyStateTitle}>{t("no_tickets_found")}</Text>
@@ -136,17 +153,17 @@ export default function MyTicketsScreen() {
             </Text>
           </View>
         ) : (
-          filteredTickets.map((ticket) => (
-            <TouchableOpacity key={ticket.id} style={styles.ticketCard}>
+          filteredBookings.map((b) => (
+            <View key={b.id} style={styles.ticketCard}>
               <Image
-                source={{ uri: ticket.image }}
+                source={{
+                  uri: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=300",
+                }}
                 style={styles.ticketImage}
                 resizeMode="cover"
               />
               <View style={styles.ticketContent}>
-                <Text style={styles.ticketDestination}>
-                  {ticket.destination}
-                </Text>
+                <Text style={styles.ticketDestination}>{b.travel?.title}</Text>
                 <View style={styles.ticketDetails}>
                   <View style={styles.ticketDetail}>
                     <Ionicons
@@ -154,32 +171,108 @@ export default function MyTicketsScreen() {
                       size={16}
                       color="#718096"
                     />
-                    <Text style={styles.ticketDetailText}>{ticket.date}</Text>
+                    <Text style={styles.ticketDetailText}>
+                      {b.travel?.startDate
+                        ? new Date(b.travel.startDate).toLocaleDateString()
+                        : ""}
+                      {b.travel?.endDate
+                        ? ` - ${new Date(
+                            b.travel.endDate
+                          ).toLocaleDateString()}`
+                        : ""}
+                    </Text>
                   </View>
                   <View style={styles.ticketDetail}>
                     <Ionicons name="cash-outline" size={16} color="#718096" />
-                    <Text style={styles.ticketDetailText}>{ticket.price}</Text>
+                    <Text style={styles.ticketDetailText}>
+                      {b.travel?.price ? `${b.travel.price} ${t("br")}` : ""}
+                    </Text>
                   </View>
                 </View>
                 <View style={styles.ticketFooter}>
                   <View
                     style={[
                       styles.statusBadge,
-                      { backgroundColor: getStatusColor(ticket.status) },
+                      { backgroundColor: getStatusColor(b.status) },
                     ]}
                   >
                     <Text style={styles.statusText}>
-                      {getStatusText(ticket.status)}
+                      {getStatusText(b.status)}
                     </Text>
                   </View>
-                  <TouchableOpacity style={styles.viewButton}>
-                    <Text style={styles.viewButtonText}>
-                      {t("view_details")}
-                    </Text>
-                  </TouchableOpacity>
+                  {b.status === "PENDING" ? (
+                    <TouchableOpacity
+                      style={styles.viewButton}
+                      onPress={async () => {
+                        try {
+                          await cancelBooking(b.id);
+                          onRefresh();
+                        } catch (e: any) {
+                          alert(e.message || "Failed to cancel booking");
+                        }
+                      }}
+                    >
+                      <Text style={styles.viewButtonText}>{t("cancel")}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={{ width: 100 }} />
+                  )}
                 </View>
+
+                {b.tickets?.length > 0 && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text
+                      style={{
+                        fontWeight: "600",
+                        color: "#1a202c",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {t("tickets")}
+                    </Text>
+                    {b.tickets.map((tk: any) => (
+                      <View
+                        key={tk.id}
+                        style={{
+                          borderWidth: 1,
+                          borderColor: "#e2e8f0",
+                          borderRadius: 8,
+                          padding: 12,
+                          marginBottom: 8,
+                          backgroundColor: "#ffffff",
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            marginBottom: 8,
+                          }}
+                        >
+                          <Text style={{ fontWeight: "600", color: "#2d3748" }}>
+                            {tk.name}
+                          </Text>
+                          <Text style={{ color: "#718096" }}>Age {tk.age}</Text>
+                        </View>
+                        <Text style={{ color: "#718096", marginBottom: 8 }}>
+                          Badge: {tk.badgeNumber}
+                        </Text>
+                        {tk.qrCodeUrl ? (
+                          <Image
+                            source={{ uri: tk.qrCodeUrl }}
+                            style={{
+                              width: 160,
+                              height: 160,
+                              alignSelf: "center",
+                            }}
+                          />
+                        ) : null}
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
-            </TouchableOpacity>
+            </View>
           ))
         )}
       </ScrollView>

@@ -139,6 +139,72 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Password/PIN based login (no OTP)
+  const loginWithPin = async (phone, pin) => {
+    try {
+      setIsLoading(true);
+      const res = await makeFetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, password: pin }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Invalid credentials");
+      }
+      const data = await res.json();
+      const { token, user } = data;
+      setUser(user);
+      setIsAuthenticated(true);
+      await AsyncStorage.setItem("userToken", token);
+      await AsyncStorage.setItem("userData", JSON.stringify(user));
+      return true;
+    } catch (error) {
+      console.error("Login failed:", error);
+      const msg =
+        error.name === "AbortError"
+          ? "Request timed out. Check network/Wi‑Fi."
+          : error.message || "Failed to login.";
+      Alert.alert("Login Error", msg);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Password/PIN based registration (no OTP)
+  const registerWithPin = async ({ phone, name, pin }) => {
+    try {
+      setIsLoading(true);
+      const res = await makeFetch(`${API_URL}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, name, password: pin }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Registration failed");
+      }
+      const data = await res.json();
+      const { token, user } = data;
+      setUser(user);
+      setIsAuthenticated(true);
+      await AsyncStorage.setItem("userToken", token);
+      await AsyncStorage.setItem("userData", JSON.stringify(user));
+      return true;
+    } catch (error) {
+      console.error("Registration failed:", error);
+      const msg =
+        error.name === "AbortError"
+          ? "Request timed out. Check network/Wi‑Fi."
+          : error.message || "Failed to register.";
+      Alert.alert("Registration Error", msg);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       setIsLoading(true);
@@ -162,7 +228,19 @@ export const AuthProvider = ({ children }) => {
     requestOTP,
     verifyOTP,
     resendOTP,
+    loginWithPin,
+    registerWithPin,
     logout,
+    setUser: async (nextUser) => {
+      try {
+        setUser(nextUser);
+        if (nextUser) {
+          await AsyncStorage.setItem("userData", JSON.stringify(nextUser));
+        }
+      } catch (e) {
+        console.warn("Failed to persist user", e);
+      }
+    },
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

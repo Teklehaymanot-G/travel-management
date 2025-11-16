@@ -12,6 +12,7 @@ const travelRoutes = require("./routes/travels");
 const homeRoute = require("./routes/home");
 const bookingRoutes = require("./routes/bookings");
 const paymentRoutes = require("./routes/payments");
+const bankRoutes = require("./routes/banks");
 const documentRoutes = require("./routes/documents");
 const commentRoutes = require("./routes/comments");
 const couponRoutes = require("./routes/coupons");
@@ -83,6 +84,7 @@ app.use("/api/travels", authMiddleware, travelRoutes);
 app.use("/api/home", homeRoute);
 app.use("/api/bookings", authMiddleware, bookingRoutes);
 app.use("/api/payments", authMiddleware, paymentRoutes);
+app.use("/api/banks", authMiddleware, bankRoutes);
 app.use("/api/documents", documentRoutes); // Updated - some routes are public
 app.use("/api/comments", commentRoutes); // Updated - some routes are public
 app.use("/api/roles", authMiddleware, roleRoutes); // Add this line

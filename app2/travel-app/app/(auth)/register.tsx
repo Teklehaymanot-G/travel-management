@@ -1,11 +1,10 @@
-// import PhoneInput from "@/components/auth/PhoneInput";
-// import AppButton from "@/components/common/AppButton";
-// import { useAuth } from "@/context/AuthContext";
 import PhoneInput from "@/src/components/auth/PhoneInput";
 import AppButton from "@/src/components/common/AppButton";
 import { useAuth } from "@/src/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import { Colors } from "@/constants/theme";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -22,25 +21,27 @@ import {
   View,
 } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+const { height } = Dimensions.get("window");
 
-export default function RegisterScreen({ navigation }) {
+export default function RegisterScreen() {
   const { t, i18n } = useTranslation();
-  const { isLoading, requestOTP } = useAuth();
+  const { isLoading, registerWithPin } = useAuth();
+  const router = useRouter();
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
   const [isValid, setIsValid] = useState(false);
 
   const fadeAnim = useState(new Animated.Value(0))[0];
   const slideAnim = useState(new Animated.Value(50))[0];
-  const isRTL = i18n.language === "am";
 
   React.useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1000,
+        duration: 800,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
@@ -49,7 +50,7 @@ export default function RegisterScreen({ navigation }) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [fadeAnim, slideAnim]);
 
   const handleRegister = async () => {
     if (!isValid || !name) {
@@ -58,10 +59,16 @@ export default function RegisterScreen({ navigation }) {
       ]);
       return;
     }
-    const ok = await requestOTP(phone);
-    if (ok) {
-      navigation.navigate("otp-verification", { phone, name });
+    if (!pin || pin.length < 4 || pin !== confirmPin) {
+      Alert.alert(
+        t("invalid_pin"),
+        pin !== confirmPin ? t("pin_mismatch") : t("please_enter_valid_pin"),
+        [{ text: t("ok") }]
+      );
+      return;
     }
+    const ok = await registerWithPin({ phone, name, pin });
+    if (ok) router.replace("/(app)/(tabs)");
   };
 
   const toggleLanguage = () => {
@@ -75,10 +82,9 @@ export default function RegisterScreen({ navigation }) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <LinearGradient
-        colors={["#667eea", "#764ba2"]}
+        colors={[Colors.light.brandStart, Colors.light.brandEnd]}
         style={styles.background}
       />
-
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -86,7 +92,7 @@ export default function RegisterScreen({ navigation }) {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
           >
             <Ionicons name="arrow-back" size={24} color="#ffffff" />
           </TouchableOpacity>
@@ -103,22 +109,22 @@ export default function RegisterScreen({ navigation }) {
         <Animated.View
           style={[
             styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
           <View style={styles.welcomeSection}>
             <View style={styles.logoContainer}>
               <LinearGradient
-                colors={["#ffffff", "#f8f9fa"]}
+                colors={[Colors.light.brandSurface, "#ffffff"]}
                 style={styles.logoBackground}
               >
-                <Ionicons name="person-add" size={40} color="#667eea" />
+                <Ionicons
+                  name="person-add"
+                  size={40}
+                  color={Colors.light.brandAccent}
+                />
               </LinearGradient>
             </View>
-
             <Text style={styles.title}>{t("create_account")}</Text>
             <Text style={styles.subtitle}>
               {t("join_travelease_community")}
@@ -141,11 +147,10 @@ export default function RegisterScreen({ navigation }) {
                   placeholderTextColor="#a0aec0"
                   value={name}
                   onChangeText={setName}
-                  selectionColor="#667eea"
+                  selectionColor={Colors.light.brandAccent}
                 />
               </View>
             </View>
-
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>{t("email")}</Text>
               <View style={styles.textInputWrapper}>
@@ -163,11 +168,10 @@ export default function RegisterScreen({ navigation }) {
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  selectionColor="#667eea"
+                  selectionColor={Colors.light.brandAccent}
                 />
               </View>
             </View>
-
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>{t("phone_number")}</Text>
               <PhoneInput
@@ -177,10 +181,48 @@ export default function RegisterScreen({ navigation }) {
                 style={styles.phoneInput}
               />
             </View>
-
-            <Text style={styles.helperText}>
-              {t("we_will_send_otp_verification")}
-            </Text>
+            <View style={{ height: 8 }} />
+            <Text style={styles.inputLabel}>{t("pin_code")}</Text>
+            <View style={styles.textInputWrapper}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color="#a0aec0"
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder={t("enter_pin")}
+                placeholderTextColor="#a0aec0"
+                value={pin}
+                onChangeText={setPin}
+                keyboardType="number-pad"
+                secureTextEntry
+                maxLength={6}
+                selectionColor={Colors.light.brandAccent}
+              />
+            </View>
+            <View style={{ height: 12 }} />
+            <Text style={styles.inputLabel}>{t("confirm_pin")}</Text>
+            <View style={styles.textInputWrapper}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color="#a0aec0"
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.textInput}
+                placeholder={t("reenter_pin")}
+                placeholderTextColor="#a0aec0"
+                value={confirmPin}
+                onChangeText={setConfirmPin}
+                keyboardType="number-pad"
+                secureTextEntry
+                maxLength={6}
+                selectionColor={Colors.light.brandAccent}
+              />
+            </View>
           </View>
 
           <AppButton
@@ -189,13 +231,13 @@ export default function RegisterScreen({ navigation }) {
             disabled={!isValid || !name || isLoading}
             loading={isLoading}
             style={styles.registerButton}
-            gradient={["#667eea", "#764ba2"]}
+            textStyle={styles.registerButtonText}
+            gradient={[Colors.light.brandStart, Colors.light.brandEnd]}
             icon="person-add"
           />
-
           <View style={styles.loginContainer}>
             <Text style={styles.loginText}>{t("already_have_account")}</Text>
-            <TouchableOpacity onPress={() => navigation.navigate("login")}>
+            <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
               <Text style={styles.loginLink}>{t("sign_in")}</Text>
             </TouchableOpacity>
           </View>
@@ -282,14 +324,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.3)",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 30,
+    fontWeight: "700",
     color: "#ffffff",
     textAlign: "center",
     marginBottom: 8,
-    textShadowColor: "rgba(0, 0, 0, 0.1)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 16,
@@ -299,17 +339,19 @@ const styles = StyleSheet.create({
   },
   inputSection: {
     backgroundColor: "#ffffff",
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
     marginBottom: 24,
-    shadowColor: "#000",
+    shadowColor: "#0a7ea4",
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 6,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
   inputContainer: {
     marginBottom: 20,
@@ -323,10 +365,10 @@ const styles = StyleSheet.create({
   textInputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f7fafc",
+    backgroundColor: "#f1f5f9",
     borderWidth: 2,
-    borderColor: "#e2e8f0",
-    borderRadius: 12,
+    borderColor: "#cfd8dc",
+    borderRadius: 14,
     overflow: "hidden",
   },
   inputIcon: {
@@ -349,14 +391,17 @@ const styles = StyleSheet.create({
   },
   registerButton: {
     marginBottom: 24,
-    shadowColor: "#667eea",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowColor: Colors.light.brandAccent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  registerButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#ffffff",
+    letterSpacing: 0.5,
   },
   loginContainer: {
     flexDirection: "row",

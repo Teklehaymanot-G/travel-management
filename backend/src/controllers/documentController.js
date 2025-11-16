@@ -53,9 +53,8 @@ const uploadDocument = async (req, res, next) => {
     // Check if user has permission to upload documents
     // Only managers and supervisors can upload documents
     if (!["MANAGER", "SUPERVISOR"].includes(req.user.role)) {
-      return res
-        .status(403)
-        .json({ message: "Access denied. Insufficient permissions." });
+      // Access denied message temporarily commented out.
+      return res.status(403).json({ message: "" });
     }
 
     const document = await prisma.travelDocument.create({
@@ -93,9 +92,8 @@ const deleteDocument = async (req, res, next) => {
     // Check if user has permission to delete documents
     // Only managers and supervisors can delete documents
     if (!["MANAGER", "SUPERVISOR"].includes(req.user.role)) {
-      return res
-        .status(403)
-        .json({ message: "Access denied. Insufficient permissions." });
+      // Access denied message temporarily commented out.
+      return res.status(403).json({ message: "" });
     }
 
     await prisma.travelDocument.delete({

@@ -13,6 +13,11 @@ router.post("/", createPayment);
 
 // Admin routes
 router.get("/", authorize(["MANAGER", "SUPERVISOR"]), getPayments);
-router.patch("/:id/status", authorize(["SUPERVISOR"]), updatePaymentStatus);
+// Allow MANAGER and SUPERVISOR to approve/reject payments
+router.patch(
+  "/:id/status",
+  authorize(["MANAGER", "SUPERVISOR"]),
+  updatePaymentStatus
+);
 
 module.exports = router;

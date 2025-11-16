@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
+import { Colors } from "@/constants/theme";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -15,10 +16,14 @@ const AppButton = ({
   loading = false,
   style,
   textStyle,
-  gradient = ["#667eea", "#764ba2"],
+  gradient,
   icon,
   iconPosition = "right",
 }) => {
+  const brandGradient = [Colors.light.brandStart, Colors.light.brandEnd];
+  const appliedGradient =
+    gradient && gradient.length === 2 ? gradient : brandGradient;
+
   const ButtonContent = (
     <>
       {loading ? (
@@ -65,7 +70,7 @@ const AppButton = ({
       style={style}
     >
       <LinearGradient
-        colors={gradient}
+        colors={appliedGradient}
         style={[styles.button, disabled && styles.buttonDisabled]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}

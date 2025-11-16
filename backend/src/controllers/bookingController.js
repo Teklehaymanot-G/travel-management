@@ -129,10 +129,10 @@ const getAllBookings = async (req, res, next) => {
   }
 };
 
-// Create booking
+// Create booking (defer ticket creation until payment approval)
 const createBooking = async (req, res, next) => {
   try {
-    const { travelId, travelers } = req.body;
+    const { travelId, travelers = [] } = req.body;
 
     // Check if travel exists
     const travel = await prisma.travel.findUnique({
@@ -143,41 +143,36 @@ const createBooking = async (req, res, next) => {
       return res.status(404).json({ message: "Travel not found" });
     }
 
-    // Create booking
+    // Persist booking with participants JSON, status PENDING
     const booking = await prisma.booking.create({
       data: {
         travelerId: req.user.id,
         travelId: parseInt(travelId),
         status: "PENDING",
+        participants: Array.isArray(travelers)
+          ? travelers.map((t) => ({
+              name: String(t?.name || "Traveler"),
+              age: Number.parseInt(t?.age || 18),
+            }))
+          : undefined,
       },
-    });
-
-    // Create tickets for each traveler
-    const ticketPromises = travelers.map(async (traveler) => {
-      const badgeNumber = generateBadgeNumber();
-      const qrCodeData = `BOOKING:${booking.id}-TRAVELER:${traveler.name}`;
-      const qrCodeUrl = await generateQRCode(qrCodeData);
-
-      return prisma.ticket.create({
-        data: {
-          bookingId: booking.id,
-          name: traveler.name,
-          age: parseInt(traveler.age),
-          badgeNumber,
-          qrCodeUrl,
+      include: {
+        travel: {
+          select: {
+            id: true,
+            title: true,
+            startDate: true,
+            endDate: true,
+            price: true,
+          },
         },
-      });
-    });
-
-    const tickets = await Promise.all(ticketPromises);
-
-    res.status(201).json({
-      success: true,
-      data: {
-        booking,
-        tickets,
+        traveler: { select: { id: true, name: true, phone: true } },
+        tickets: true,
       },
     });
+
+    // No tickets yet; payment flow will generate tickets upon approval
+    res.status(201).json({ success: true, data: booking });
   } catch (error) {
     next(error);
   }
@@ -243,10 +238,31 @@ const cancelMyBooking = async (req, res, next) => {
   }
 };
 
+// Get booking by id (admin)
+const getBookingById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const booking = await prisma.booking.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        travel: true,
+        traveler: { select: { id: true, name: true, phone: true } },
+        tickets: true,
+        payment: true,
+      },
+    });
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    res.json({ success: true, data: booking });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getUserBookings,
   getAllBookings,
   createBooking,
   updateBookingStatus,
   cancelMyBooking,
+  getBookingById,
 };

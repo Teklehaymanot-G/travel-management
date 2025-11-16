@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { createPayment } from "@/src/services/paymentService";
 import * as ImagePicker from "expo-image-picker";
 import { t } from "i18next";
 import { useState } from "react";
@@ -14,9 +15,13 @@ import {
   View,
 } from "react-native";
 
-const PaymentSection = () => {
+interface PaymentSectionProps {
+  bookingId?: number | null;
+}
+
+const PaymentSection = ({ bookingId }: PaymentSectionProps) => {
   const [paymentStep, setPaymentStep] = useState("select_method"); // 'select_method', 'bank_details', 'confirm_payment', 'pending', 'confirmed'
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("");
+  // Track method if multiple methods added later; currently unused so omitted to avoid lint warning.
   const [screenshot, setScreenshot] = useState<any>(null);
   const [referenceNumber, setReferenceNumber] = useState("");
   const [amount, setAmount] = useState("");
@@ -40,8 +45,8 @@ const PaymentSection = () => {
     },
   ];
 
-  const handlePaymentMethodSelect = (method: string) => {
-    setSelectedPaymentMethod(method);
+  const handlePaymentMethodSelect = (_method: string) => {
+    // In future store method; for now just advance the step
     setPaymentStep("bank_details");
   };
 
@@ -68,7 +73,7 @@ const PaymentSection = () => {
       if (!result.canceled) {
         setScreenshot(result.assets[0]);
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to pick image");
     }
   };
@@ -94,12 +99,16 @@ const PaymentSection = () => {
       if (!result.canceled) {
         setScreenshot(result.assets[0]);
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to take photo");
     }
   };
 
-  const handleSubmitPayment = () => {
+  const handleSubmitPayment = async () => {
+    if (!bookingId) {
+      Alert.alert("Booking Required", "Please create a booking first.");
+      return;
+    }
     if (!screenshot || !referenceNumber || !amount) {
       Alert.alert(
         "Incomplete Information",
@@ -107,23 +116,27 @@ const PaymentSection = () => {
       );
       return;
     }
-
-    setPaymentStep("pending");
-    // Here you would typically send the data to your backend
-    console.log("Payment submitted:", {
-      referenceNumber,
-      amount,
-      screenshot: screenshot.uri,
-    });
+    try {
+      setPaymentStep("pending");
+      const receiptUrl = screenshot?.base64
+        ? `data:image/jpeg;base64,${screenshot.base64}`
+        : screenshot?.uri;
+      const res = await createPayment({ bookingId, receiptUrl });
+      if (!res?.success) throw new Error("Submission failed");
+      Alert.alert(
+        t("payment_submitted") || "Payment Submitted",
+        t("awaiting_approval") || "Your payment is pending admin approval."
+      );
+    } catch (e: any) {
+      Alert.alert(
+        t("error") || "Error",
+        e.message || "Failed to submit payment"
+      );
+      setPaymentStep("confirm_payment");
+    }
   };
 
-  const simulatePaymentConfirmation = () => {
-    setPaymentStep("confirmed");
-    Alert.alert(
-      "Payment Confirmed",
-      "Your payment has been confirmed successfully!"
-    );
-  };
+  // Removed simulation confirmation; real approval handled by admin.
 
   const renderPaymentMethodSelection = () => (
     <View style={styles.section}>
@@ -311,15 +324,10 @@ const PaymentSection = () => {
           </Text>
         </View>
 
-        {/* For demo purposes - simulate confirmation */}
-        <TouchableOpacity
-          style={styles.demoButton}
-          onPress={simulatePaymentConfirmation}
-        >
-          <Text style={styles.demoButtonText}>
-            {t("simulate_confirmation")}
-          </Text>
-        </TouchableOpacity>
+        <Text style={{ fontSize: 12, color: "#718096" }}>
+          {t("pending_admin_review") ||
+            "Pending admin review. You'll receive tickets once approved."}
+        </Text>
       </View>
     </View>
   );

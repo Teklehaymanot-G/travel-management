@@ -30,6 +30,13 @@ const resources = {
       aboutSaint: "About Saint",
       readMore: "Read More",
       readLess: "Read Less",
+      // Payment rejection dialog keys
+      rejection_message_label: "Rejection Message",
+      rejection_message_optional: "Rejection Message (optional)",
+      rejection_message_placeholder: "Reason for rejection",
+      rejection_message_hint: "This message will be visible to the traveler.",
+      reject_payment_title: "Reject Payment",
+      confirm_reject_submit: "Confirm Reject",
     },
   },
   am: {
@@ -56,6 +63,13 @@ const resources = {
       aboutSaint: "ስለ ጻድቁ",
       readMore: "ተጨማሪ አንብብ",
       readLess: "ያነሰ አንብብ",
+      // የክፍያ መቀበል መረጃ ቁልፎች
+      rejection_message_label: "የመቀበል መልዕክት",
+      rejection_message_optional: "የመቀበል መልዕክት (አማራጭ)",
+      rejection_message_placeholder: "የመቀበል ምክንያት",
+      rejection_message_hint: "ይህ መልዕክት ለተጓዥው ይታያል።",
+      reject_payment_title: "ክፍያ አትቀበል",
+      confirm_reject_submit: "መቀበልን አረጋግጥ",
     },
   },
 };

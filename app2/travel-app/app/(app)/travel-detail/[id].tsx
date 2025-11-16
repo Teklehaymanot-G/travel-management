@@ -162,6 +162,20 @@ export default function TravelDetailScreen() {
   };
 
   const handleBookNow = () => {
+    if (!user) {
+      Alert.alert(
+        t("authentication_required") || "Login Required",
+        t("please_login_to_continue") || "Please login to continue",
+        [
+          { text: t("cancel") || "Cancel", style: "cancel" },
+          {
+            text: t("login") || "Login",
+            onPress: () => router.push("/(auth)/login"),
+          },
+        ]
+      );
+      return;
+    }
     router.push(`/booking/${travel.id}`);
   };
 

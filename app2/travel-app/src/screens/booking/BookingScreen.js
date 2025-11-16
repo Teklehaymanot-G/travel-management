@@ -42,7 +42,7 @@ const BookingScreen = ({ route, navigation }) => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Book Your Trip</Text>
+        <Text style={styles.title}>Book Your Trips</Text>
         <Text style={styles.subtitle}>{travel.title}</Text>
       </View>
 

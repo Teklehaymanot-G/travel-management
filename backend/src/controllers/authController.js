@@ -1,6 +1,8 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { PrismaClient } = require("@prisma/client");
+const path = require("path");
+const fs = require("fs");
 const prisma = new PrismaClient();
 
 // Generate JWT Token
@@ -156,11 +158,58 @@ const verifyRegisterOtp = async (req, res, next) => {
   }
 };
 
+// Register with PIN/password (no SMS)
+const registerWithPassword = async (req, res, next) => {
+  try {
+    let { phone, name, password, role = "TRAVELER" } = req.body || {};
+    phone = normalizeEthiopianPhone(phone);
+    if (!isValidEthiopianMobile(phone)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid Ethiopian phone format" });
+    }
+    if (!name || !password) {
+      return res.status(400).json({ message: "Name and PIN are required" });
+    }
+    // basic PIN policy: 4-6 digits allowed (or longer password >= 6 chars)
+    const isAllDigits = /^\d{4,6}$/.test(password);
+    const isPasswordLike = typeof password === "string" && password.length >= 6;
+    if (!isAllDigits && !isPasswordLike) {
+      return res
+        .status(400)
+        .json({ message: "PIN must be 4-6 digits or password >= 6 chars" });
+    }
+
+    const exists = await prisma.user.findUnique({ where: { phone } });
+    if (exists) {
+      return res.status(409).json({ message: "User already exists" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const newUser = await prisma.user.create({
+      data: { phone, name, role, password: hashedPassword },
+      select: {
+        id: true,
+        phone: true,
+        name: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+    const token = generateToken(newUser.id);
+    res.status(201).json({ success: true, token, user: newUser });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Login user
 const login = async (req, res, next) => {
   try {
     console.log(req.body);
-    const { phone, password } = req.body;
+    let { phone, password } = req.body;
+    phone = normalizeEthiopianPhone(phone);
     // Check if user exists
     const user = await prisma.user.findUnique({
       where: { phone },
@@ -178,8 +227,10 @@ const login = async (req, res, next) => {
     }
 
     // Check password
-    // const isPasswordMatch = await bcrypt.compare(password, user.password);
-    const isPasswordMatch = true;
+    const isPasswordMatch = await bcrypt.compare(
+      password || "",
+      user.password || ""
+    );
 
     if (!isPasswordMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
@@ -210,6 +261,7 @@ const getMe = async (req, res, next) => {
         id: true,
         phone: true,
         name: true,
+        profileImageUrl: true,
         role: true,
         createdAt: true,
       },
@@ -224,9 +276,69 @@ const getMe = async (req, res, next) => {
   }
 };
 
+// Update current user (name, password, profile image)
+const updateMe = async (req, res, next) => {
+  try {
+    const { name, currentPassword, newPassword, profileImageUrl } =
+      req.body || {};
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const data = {};
+    if (typeof name === "string" && name.trim()) data.name = name.trim();
+
+    if (
+      newPassword &&
+      typeof newPassword === "string" &&
+      newPassword.length >= 6
+    ) {
+      if (currentPassword && user.password) {
+        const ok = await bcrypt.compare(currentPassword, user.password);
+        if (!ok)
+          return res
+            .status(400)
+            .json({ message: "Current password incorrect" });
+      }
+      const salt = await bcrypt.genSalt(10);
+      data.password = await bcrypt.hash(newPassword, salt);
+    }
+
+    // Handle profile image: prefer uploaded file, fallback to provided URL/base64
+    if (req.file) {
+      const url = `${req.protocol}://${req.get("host")}/uploads/profiles/${
+        req.file.filename
+      }`;
+      data.profileImageUrl = url;
+    } else if (profileImageUrl) {
+      // Accept data URI or http(s) URL directly
+      data.profileImageUrl = profileImageUrl;
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data,
+      select: {
+        id: true,
+        phone: true,
+        name: true,
+        profileImageUrl: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({ success: true, user: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   requestRegisterOtp,
   verifyRegisterOtp,
+  registerWithPassword,
   login,
   getMe,
+  updateMe,
 };

@@ -1,15 +1,15 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-// using react-navigation via `navigation` prop provided by RootStack
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { Colors } from "../../../constants/theme";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
   Animated,
   Dimensions,
-  Image,
   KeyboardAvoidingView,
+  TextInput,
   Platform,
   ScrollView,
   StyleSheet,
@@ -18,31 +18,33 @@ import {
   View,
 } from "react-native";
 import PhoneInput from "../../components/auth/PhoneInput";
-import AppButton from "../../components/common/AppButton";
 import { useAuth } from "../../context/AuthContext";
 
-const { width, height } = Dimensions.get("window");
+const { height } = Dimensions.get("window");
 
-const LoginScreen = ({ navigation }) => {
+const LoginScreen = () => {
   const { t, i18n } = useTranslation();
-  const { requestOTP, isLoading } = useAuth();
+  const { loginWithPin, isLoading } = useAuth();
   const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
   const [isValid, setIsValid] = useState(false);
-  const router = useRouter(); // Add Expo Router
+  const router = useRouter();
+  // Dark mode removed; use light palette only.
+  const C = Colors.light;
 
   const fadeAnim = useState(new Animated.Value(0))[0];
   const slideAnim = useState(new Animated.Value(50))[0];
 
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1000,
+        duration: 600,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 800,
+        duration: 600,
         useNativeDriver: true,
       }),
     ]).start();
@@ -55,15 +57,15 @@ const LoginScreen = ({ navigation }) => {
       ]);
       return;
     }
-    const success = await requestOTP(phone);
-    if (success) {
-      router.push({
-        pathname: "/(auth)/otp-verification",
-        params: { phone },
-      });
-    } else {
-      Alert.alert(t("error"), t("failed_to_send_otp"), [{ text: t("ok") }]);
+    if (!pin || pin.length < 4) {
+      Alert.alert(t("invalid_pin"), t("please_enter_valid_pin"), [
+        { text: t("ok") },
+      ]);
+      return;
     }
+    const success = await loginWithPin(phone, pin);
+    if (success) router.replace("/(app)/(tabs)");
+    else Alert.alert(t("error"), t("invalid_credentials"), [{ text: t("ok") }]);
   };
 
   const toggleLanguage = () => {
@@ -77,24 +79,14 @@ const LoginScreen = ({ navigation }) => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <LinearGradient
-        colors={["#4F46E5", "#7C3AED"]}
+        colors={[C.brandStart, C.brandEnd]}
         style={styles.background}
       />
-
-      {/* Background Pattern */}
-      <View style={styles.patternContainer}>
-        <Image
-          source={require("../../assets/images/pattern.png")}
-          style={styles.pattern}
-          blurRadius={5}
-        />
-      </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.languageButton}
@@ -104,39 +96,39 @@ const LoginScreen = ({ navigation }) => {
               {i18n.language === "en" ? "አማ" : "EN"}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerRegisterBtn}
+            onPress={() => router.push("/(auth)/register")}
+          >
+            <Text style={styles.headerRegisterText}>{t("create_account")}</Text>
+          </TouchableOpacity>
         </View>
 
         <Animated.View
           style={[
             styles.content,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
+            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
           ]}
         >
-          {/* Logo and Welcome Section */}
           <View style={styles.welcomeSection}>
-            <View style={styles.logoContainer}>
-              <LinearGradient
-                colors={["#ffffff", "#f8f9fa"]}
-                style={styles.logoBackground}
-              >
-                <MaterialCommunityIcons name="bus" size={44} color="#4F46E5" />
-              </LinearGradient>
-            </View>
-
             <Text style={styles.title}>{t("welcome_to_travelbus")}</Text>
-            <Text style={styles.subtitle}>{t("sign_in_with_phone")}</Text>
+            <Text style={styles.subtitle}>{t("sign_in_with_pin")}</Text>
           </View>
 
-          {/* Phone Input Section */}
-          <View style={styles.inputSection}>
+          <View
+            style={[
+              styles.inputSection,
+              { backgroundColor: C.background, shadowColor: C.brandAccent },
+            ]}
+          >
             <View style={styles.inputHeader}>
-              <MaterialCommunityIcons name="phone" size={20} color="#4F46E5" />
+              <MaterialCommunityIcons
+                name="phone"
+                size={20}
+                color={C.brandAccent}
+              />
               <Text style={styles.inputLabel}>{t("phone_number")}</Text>
             </View>
-
             <PhoneInput
               value={phone}
               onChangeText={setPhone}
@@ -144,74 +136,69 @@ const LoginScreen = ({ navigation }) => {
               style={styles.phoneInput}
             />
 
-            <Text style={styles.helperText}>{t("we_will_send_otp")}</Text>
-          </View>
-
-          {/* Continue Button */}
-          <AppButton
-            title={t("send_verification_code")}
-            onPress={handleContinue}
-            disabled={!isValid || isLoading}
-            loading={isLoading}
-            style={styles.continueButton}
-            gradient={["#4F46E5", "#7C3AED"]}
-            icon="arrow-forward"
-          />
-
-          {/* Features Section */}
-          <View style={styles.featuresSection}>
-            <View style={styles.featureItem}>
+            <View style={{ height: 16 }} />
+            <View style={styles.inputHeader}>
               <MaterialCommunityIcons
-                name="shield-check"
-                size={24}
-                color="#10B981"
+                name="lock"
+                size={20}
+                color={C.brandAccent}
               />
-              <Text style={styles.featureText}>{t("secure_verification")}</Text>
+              <Text style={styles.inputLabel}>{t("pin_code")}</Text>
             </View>
-            <View style={styles.featureItem}>
-              <MaterialCommunityIcons
-                name="clock-fast"
-                size={24}
-                color="#3B82F6"
+            <View
+              style={[
+                styles.pinInputWrapper,
+                { backgroundColor: C.brandSurface, borderColor: C.brandAccent },
+              ]}
+            >
+              <TextInput
+                value={pin}
+                onChangeText={setPin}
+                placeholder={t("enter_pin")}
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry
+                keyboardType="number-pad"
+                style={styles.pinInput}
+                maxLength={6}
               />
-              <Text style={styles.featureText}>{t("instant_otp")}</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <MaterialCommunityIcons
-                name="account-group"
-                size={24}
-                color="#8B5CF6"
-              />
-              <Text style={styles.featureText}>{t("easy_booking")}</Text>
             </View>
           </View>
 
-          {/* Footer */}
+          <View style={{ paddingHorizontal: 24 }}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              disabled={!isValid || isLoading}
+              onPress={handleContinue}
+              style={styles.continueButton}
+            >
+              <LinearGradient
+                colors={[C.brandStart, C.brandEnd]}
+                style={{
+                  width: "100%",
+                  paddingVertical: 16,
+                  borderRadius: 16,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontWeight: "700",
+                    fontSize: 16,
+                  }}
+                >
+                  {t("login")}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              {t("by_continuing_you_agree")}
-            </Text>
-            <View style={styles.termsContainer}>
-              <TouchableOpacity>
-                <Text style={styles.termsLink}>{t("terms_of_service")}</Text>
+            <View style={styles.accountContainer}>
+              <Text style={styles.accountText}>{t("dont_have_account")}</Text>
+              <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+                <Text style={styles.accountLink}>{t("create_account")}</Text>
               </TouchableOpacity>
-              <Text style={styles.footerText}> {t("and")} </Text>
-              <TouchableOpacity>
-                <Text style={styles.termsLink}>{t("privacy_policy")}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Support Info */}
-            <View style={styles.supportSection}>
-              <MaterialCommunityIcons
-                name="headset"
-                size={16}
-                color="#6B7280"
-              />
-              <Text style={styles.supportText}>
-                {t("need_help")}
-                <Text style={styles.supportLink}> {t("contact_support")}</Text>
-              </Text>
             </View>
           </View>
         </Animated.View>
@@ -232,19 +219,6 @@ const styles = StyleSheet.create({
     top: 0,
     height: height * 0.5,
   },
-  patternContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0.1,
-  },
-  pattern: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 40,
@@ -253,15 +227,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: Platform.OS === "ios" ? 60 : 40,
     paddingBottom: 20,
-    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   languageButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  headerRegisterBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  headerRegisterText: {
+    color: "#ffffff",
+    fontWeight: "600",
+    fontSize: 14,
   },
   languageText: {
     color: "#ffffff",
@@ -275,63 +264,38 @@ const styles = StyleSheet.create({
   },
   welcomeSection: {
     alignItems: "center",
-    marginBottom: 48,
-  },
-  logoContainer: {
     marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  logoBackground: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "rgba(255, 255, 255, 0.3)",
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 30,
+    fontWeight: "700",
     color: "#ffffff",
     textAlign: "center",
     marginBottom: 8,
-    textShadowColor: "rgba(0, 0, 0, 0.1)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: "rgba(255, 255, 255, 0.9)",
+    color: "rgba(255, 255, 255, 0.85)",
     textAlign: "center",
-    lineHeight: 22,
-    fontWeight: "500",
   },
   inputSection: {
     backgroundColor: "#ffffff",
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
     marginBottom: 24,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowColor: Colors.light.brandAccent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
   inputHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   inputLabel: {
     fontSize: 16,
@@ -340,82 +304,48 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   phoneInput: {
-    marginBottom: 12,
-  },
-  helperText: {
-    fontSize: 14,
-    color: "#718096",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  continueButton: {
-    marginBottom: 32,
-    shadowColor: "#4F46E5",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  featuresSection: {
-    marginBottom: 32,
-  },
-  featureItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderRadius: 12,
     marginBottom: 8,
   },
-  featureText: {
-    fontSize: 14,
-    color: "#374151",
-    fontWeight: "500",
-    marginLeft: 12,
+  pinInputWrapper: {
+    backgroundColor: Colors.light.brandSurface,
+    borderWidth: 2,
+    borderColor: "#cfd8dc",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+  },
+  pinInput: {
+    height: 48,
+    fontSize: 16,
+    color: "#111827",
+  },
+  continueButton: {
+    marginBottom: 24,
+    marginTop: -8,
+    shadowColor: Colors.light.brandAccent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    elevation: 10,
   },
   footer: {
     alignItems: "center",
   },
-  footerText: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.8)",
-    textAlign: "center",
-    lineHeight: 16,
-  },
-  termsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  termsLink: {
-    fontSize: 12,
-    color: "#ffffff",
-    fontWeight: "600",
-    textDecorationLine: "underline",
-  },
-  supportSection: {
+  accountContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 8,
+    justifyContent: "center",
+    marginBottom: 16,
   },
-  supportText: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.8)",
-    marginLeft: 8,
-  },
-  supportLink: {
+  accountText: {
+    fontSize: 14,
     color: "#ffffff",
-    fontWeight: "600",
+    opacity: 0.9,
+    marginRight: 8,
+  },
+  accountLink: {
+    fontSize: 14,
+    color: "#ffffff",
+    fontWeight: "700",
     textDecorationLine: "underline",
   },
 });

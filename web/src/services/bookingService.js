@@ -21,3 +21,8 @@ export const cancelBooking = async (id) => {
   const res = await apiClient.patch(`${API_URL}/${id}/cancel`);
   return res.data;
 };
+
+export const getMyBookings = async (params) => {
+  const res = await apiClient.get(`${API_URL}/my-bookings`, { params });
+  return res.data;
+};

@@ -2,16 +2,30 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-const uploadsRoot = path.join(process.cwd(), "uploads", "travels");
+// Root uploads directory
+const uploadsRoot = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsRoot)) fs.mkdirSync(uploadsRoot, { recursive: true });
 
-// Ensure upload directory exists
-if (!fs.existsSync(uploadsRoot)) {
-  fs.mkdirSync(uploadsRoot, { recursive: true });
+// Ensure default 'travels' subfolder exists for legacy references
+const defaultRoot = path.join(uploadsRoot, "travels");
+if (!fs.existsSync(defaultRoot)) fs.mkdirSync(defaultRoot, { recursive: true });
+
+// Dynamic subfolder based on target (e.g., 'banks')
+function resolveUploadRoot(req) {
+  const target = (
+    req.uploadTarget ||
+    req.query.uploadTarget ||
+    req.body.uploadTarget ||
+    "travels"
+  ).toString();
+  return path.join(uploadsRoot, target);
 }
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadsRoot);
+    const root = resolveUploadRoot(req);
+    if (!fs.existsSync(root)) fs.mkdirSync(root, { recursive: true });
+    cb(null, root);
   },
   filename: function (req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();

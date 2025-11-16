@@ -1,34 +1,23 @@
-// import AppButton from "@/components/common/AppButton";
-// import { useAuth } from "@/context/AuthContext";
 import AppButton from "@/src/components/common/AppButton";
 import { useAuth } from "@/src/context/AuthContext";
+import { fetchTravel } from "@/src/services/travelService";
+import { createBooking } from "@/src/services/bookingService";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
+  TextInput,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import PaymentSection from "./PaymentSection";
+// Payment is handled in My Bookings > Booking Detail
 
-type Travel = { id: string; title: string; price: number };
-const travelData: { [key: string]: Travel } = {
-  "1": {
-    id: "1",
-    title: "Lalibela Rock-Hewn Churches",
-    price: 450,
-  },
-  "2": {
-    id: "2",
-    title: "Danakil Depression Adventure",
-    price: 680,
-  },
-};
+type Travel = { id: number; title: string; price: number };
 
 export default function BookingScreen() {
   const { id } = useLocalSearchParams();
@@ -36,29 +25,69 @@ export default function BookingScreen() {
   const { t } = useTranslation();
   const { user } = useAuth();
 
-  const travel = travelData[id as string];
-  const [travelers, setTravelers] = useState(1);
-  const [selectedDate, setSelectedDate] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [travel, setTravel] = useState<Travel | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!travel) {
+  const [travelers, setTravelers] = useState(1);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [participants, setParticipants] = useState<
+    { name: string; age: string }[]
+  >([{ name: "", age: "18" }]);
+  // Payment is not handled here anymore
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await fetchTravel(id);
+        setTravel(res?.data || null);
+      } catch (e: any) {
+        setError(e?.message || "Failed to load travel");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (id) load();
+  }, [id]);
+
+  // Keep participants array length in sync with travelers count
+  useEffect(() => {
+    setParticipants((prev) => {
+      const arr = [...prev];
+      if (travelers > arr.length) {
+        // add new default entries
+        for (let i = arr.length; i < travelers; i++) {
+          arr.push({ name: "", age: "18" });
+        }
+      } else if (travelers < arr.length) {
+        arr.length = travelers;
+      }
+      return arr;
+    });
+  }, [travelers]);
+
+  if (loading) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{t("travel_not_found")}</Text>
+        <Text style={styles.errorText}>{t("loading")}...</Text>
       </View>
     );
   }
 
-  const totalPrice = travel.price * travelers;
+  if (error || !travel) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error || t("travel_not_found")}</Text>
+      </View>
+    );
+  }
+
+  const totalPrice = (travel?.price || 0) * travelers;
   const tax = totalPrice * 0.1; // 10% tax
   const finalTotal = totalPrice + tax;
 
   const handleBooking = async () => {
-    if (!selectedDate) {
-      Alert.alert(t("select_date"), t("please_select_travel_date"));
-      return;
-    }
-
     if (!user) {
       Alert.alert(t("authentication_required"), t("please_login_to_continue"));
       return;
@@ -66,17 +95,48 @@ export default function BookingScreen() {
 
     setIsProcessing(true);
 
-    // Simulate booking process
-    setTimeout(() => {
+    try {
+      // Build travelers payload; default names if empty
+      const payloadTravelers = participants.map((p, idx) => ({
+        name: p.name?.trim() || `${user?.name || "Traveler"} ${idx + 1}`,
+        age: parseInt(p.age || "18", 10) || 18,
+      }));
+
+      const res = await createBooking({
+        travelId: Number(travel.id),
+        travelers: payloadTravelers,
+      });
       setIsProcessing(false);
-      Alert.alert(t("booking_successful"), t("your_trip_has_been_booked"), [
-        {
-          text: t("view_tickets"),
-          onPress: () => router.replace("/(app)/(tabs)/my-tickets"),
-        },
-      ]);
-    }, 3000);
+      if (res?.success && res?.data) {
+        Alert.alert(
+          t("booking_created") || "Booking Created",
+          t("proceed_to_payment_instruction") ||
+            "Please submit payment in My Bookings.",
+          [
+            {
+              text: t("ok") || "OK",
+              onPress: () => router.replace("/(app)/(tabs)/my-bookings"),
+            },
+          ]
+        );
+        // Also navigate immediately
+        router.replace("/(app)/(tabs)/my-bookings");
+      } else {
+        Alert.alert(
+          t("error") || "Error",
+          t("failed_to_create_booking") || "Failed to create booking"
+        );
+      }
+    } catch (e: any) {
+      setIsProcessing(false);
+      Alert.alert(
+        t("error") || "Error",
+        e.message || "Failed to create booking"
+      );
+    }
   };
+
+  // Refresh and payment handling moved to My Bookings screens
 
   const incrementTravelers = () => {
     if (travelers < 10) {
@@ -148,33 +208,55 @@ export default function BookingScreen() {
               />
             </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t("select_travel_date")}</Text>
-          <View style={styles.dateOptions}>
-            {["2024-02-15", "2024-02-22", "2024-03-01", "2024-03-08"].map(
-              (date) => (
-                <TouchableOpacity
-                  key={date}
-                  style={[
-                    styles.dateOption,
-                    selectedDate === date && styles.selectedDateOption,
-                  ]}
-                  onPress={() => setSelectedDate(date)}
-                >
-                  <Text
-                    style={[
-                      styles.dateText,
-                      selectedDate === date && styles.selectedDateText,
-                    ]}
-                  >
-                    {new Date(date).toLocaleDateString()}
-                  </Text>
-                </TouchableOpacity>
-              )
-            )}
-          </View>
+          {/* Participants details */}
+          {participants.map((p, idx) => (
+            <View key={idx} style={styles.participantRow}>
+              <View style={styles.participantField}>
+                <Text style={styles.participantLabel}>{t("name")}</Text>
+                <View style={styles.participantInputWrap}>
+                  <Text style={styles.participantPrefix}>{idx + 1}.</Text>
+                  <TextInput
+                    placeholder={t("full_name")}
+                    value={p.name}
+                    onChangeText={(text) =>
+                      setParticipants((prev) => {
+                        const next = [...prev];
+                        next[idx] = { ...next[idx], name: text };
+                        return next;
+                      })
+                    }
+                    style={styles.participantInput}
+                  />
+                </View>
+              </View>
+              <View style={[styles.participantField, { maxWidth: 100 }]}>
+                <Text style={styles.participantLabel}>{t("age")}</Text>
+                <TextInput
+                  placeholder="18"
+                  keyboardType="number-pad"
+                  value={p.age}
+                  onChangeText={(text) =>
+                    setParticipants((prev) => {
+                      const next = [...prev];
+                      next[idx] = { ...next[idx], age: text };
+                      return next;
+                    })
+                  }
+                  style={styles.participantInput}
+                />
+              </View>
+            </View>
+          ))}
+          <AppButton
+            title={isProcessing ? t("processing") : t("confirm_booking")}
+            onPress={handleBooking}
+            disabled={isProcessing}
+            loading={isProcessing}
+            style={{ marginTop: 24 }}
+            gradient={["#667eea", "#764ba2"]}
+            icon="checkmark"
+            textStyle={undefined}
+          />
         </View>
 
         <View style={styles.section}>
@@ -197,7 +279,7 @@ export default function BookingScreen() {
           </View>
         </View>
 
-        <PaymentSection />
+        {/* Payment moved to My Bookings detail */}
 
         <View style={styles.termsContainer}>
           <Text style={styles.termsText}>
@@ -217,7 +299,7 @@ export default function BookingScreen() {
         <AppButton
           title={isProcessing ? t("processing") : t("confirm_booking")}
           onPress={handleBooking}
-          disabled={isProcessing || !selectedDate}
+          disabled={isProcessing}
           loading={isProcessing}
           style={styles.bookButton}
           gradient={["#667eea", "#764ba2"]}
@@ -462,5 +544,43 @@ const styles = StyleSheet.create({
   bookButton: {
     flex: 1,
     marginLeft: 16,
+  },
+  // Participant form styles
+  participantRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 12,
+    marginTop: 16,
+  },
+  participantField: {
+    flex: 1,
+  },
+  participantLabel: {
+    fontSize: 12,
+    color: "#718096",
+    marginBottom: 4,
+    fontWeight: "500",
+  },
+  participantInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f7fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  participantPrefix: {
+    fontSize: 14,
+    color: "#4a5568",
+    marginRight: 4,
+    fontWeight: "600",
+  },
+  participantInput: {
+    flex: 1,
+    fontSize: 14,
+    paddingVertical: 6,
+    color: "#2d3748",
   },
 });

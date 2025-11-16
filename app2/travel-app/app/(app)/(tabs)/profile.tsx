@@ -3,16 +3,18 @@
 import { useAuth } from "@/src/context/AuthContext";
 import { useLanguage } from "@/src/context/LanguageContext";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useRouter } from "expo-router";
 
 const menuItems = [
   {
@@ -24,16 +26,6 @@ const menuItems = [
     icon: "language-outline" as const,
     label: "language",
     screen: "LanguageSettings",
-  },
-  {
-    icon: "notifications-outline" as const,
-    label: "notifications",
-    screen: "NotificationSettings",
-  },
-  {
-    icon: "card-outline" as const,
-    label: "payment_methods",
-    screen: "PaymentMethods",
   },
   {
     icon: "help-circle-outline" as const,
@@ -50,8 +42,9 @@ const menuItems = [
 export default function ProfileScreen() {
   const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
-  const { currentLocale } = useLanguage();
+  const { currentLocale, changeLanguage } = useLanguage();
   const isRTL = i18n.language === "am";
+  const router = useRouter();
 
   const handleLogout = () => {
     Alert.alert(t("confirm_logout"), t("are_you_sure_logout"), [
@@ -69,6 +62,34 @@ export default function ProfileScreen() {
 
   const getLanguageName = (locale: string) => {
     return locale === "en" ? t("english") : t("amharic");
+  };
+
+  const chooseLanguage = () => {
+    Alert.alert(
+      t("language") || "Language",
+      t("change_language") || "Change Language",
+      [
+        {
+          text: t("english") || "English",
+          onPress: async () => {
+            try {
+              changeLanguage("en");
+              await i18n.changeLanguage("en");
+            } catch {}
+          },
+        },
+        {
+          text: t("amharic") || "Amharic",
+          onPress: async () => {
+            try {
+              changeLanguage("am");
+              await i18n.changeLanguage("am");
+            } catch {}
+          },
+        },
+        { text: t("cancel") || "Cancel", style: "cancel" },
+      ]
+    );
   };
 
   return (
@@ -98,8 +119,17 @@ export default function ProfileScreen() {
                 index === menuItems.length - 1 && styles.lastMenuItem,
               ]}
               onPress={() => {
-                // Handle navigation to different screens
-                Alert.alert(t("coming_soon"), t("feature_coming_soon"));
+                if (item.label === "language") {
+                  chooseLanguage();
+                } else if (item.label === "help_support") {
+                  router.push("/(app)/help-support");
+                } else if (item.label === "about_app") {
+                  router.push("/(app)/about");
+                } else if (item.label === "edit_profile") {
+                  router.push("/(app)/edit-profile");
+                } else {
+                  Alert.alert(t("coming_soon"), t("feature_coming_soon"));
+                }
               }}
             >
               <View style={styles.menuItemLeft}>
@@ -140,23 +170,52 @@ export default function ProfileScreen() {
               color="#cbd5e0"
             />
           </TouchableOpacity>
+          <View
+            style={[
+              styles.menuItem,
+              styles.lastMenuItem,
+              { height: 0, paddingVertical: 0, borderBottomWidth: 0 },
+            ]}
+          />
+        </View>
+      </View>
 
-          <TouchableOpacity
-            style={[styles.menuItem, styles.lastMenuItem]}
-            onPress={() =>
-              Alert.alert(t("coming_soon"), t("feature_coming_soon"))
-            }
-          >
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="location-outline" size={24} color="#4a5568" />
-              <Text style={styles.menuItemText}>{t("location_services")}</Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t("help_support")}</Text>
+        <View style={styles.menuContainer}>
+          <View style={styles.helpCard}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 8,
+              }}
+            >
+              <Ionicons name="help-circle-outline" size={22} color="#667eea" />
+              <Text style={[styles.menuItemText, { marginLeft: 8 }]}>
+                {t("need_help")}
+              </Text>
             </View>
-            <Ionicons
-              name={isRTL ? "chevron-back" : "chevron-forward"}
-              size={20}
-              color="#cbd5e0"
-            />
-          </TouchableOpacity>
+            <Text style={{ color: "#718096", marginBottom: 12 }}>
+              {t("contact_support")}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity
+                style={styles.supportButton}
+                onPress={() => Linking.openURL("mailto:support@example.com")}
+              >
+                <Ionicons name="mail-outline" size={18} color="#4f46e5" />
+                <Text style={styles.supportButtonText}>Email</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.supportButton}
+                onPress={() => Linking.openURL("tel:+000000000")}
+              >
+                <Ionicons name="call-outline" size={18} color="#4f46e5" />
+                <Text style={styles.supportButtonText}>Call</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -289,5 +348,25 @@ const styles = StyleSheet.create({
   copyrightText: {
     fontSize: 12,
     color: "#cbd5e0",
+  },
+  helpCard: {
+    padding: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+  },
+  supportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
+    borderRadius: 10,
+    backgroundColor: "#eef2ff",
+  },
+  supportButtonText: {
+    marginLeft: 8,
+    color: "#4338ca",
+    fontWeight: "600",
   },
 });

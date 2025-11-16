@@ -5,6 +5,7 @@ const {
   createBooking,
   updateBookingStatus,
   cancelMyBooking,
+  getBookingById,
 } = require("../controllers/bookingController");
 const authorize = require("../middleware/roles");
 
@@ -17,6 +18,7 @@ router.patch("/:id/cancel", cancelMyBooking);
 
 // Admin routes
 router.get("/", authorize(["MANAGER", "SUPERVISOR"]), getAllBookings);
+router.get("/:id", authorize(["MANAGER", "SUPERVISOR"]), getBookingById);
 router.patch(
   "/:id/status",
   authorize(["MANAGER", "SUPERVISOR"]),

@@ -12,6 +12,7 @@ model User {
   name        String?
   phone       String      @unique
   password    String
+  profileImageUrl String?
   role        Role
   bookings    Booking[]
   comments    Comment[]
@@ -52,6 +53,7 @@ model Booking {
   travel      Travel      @relation(fields: [travelId], references: [id])
   travelId    Int
   status      BookingStatus @default(PENDING)
+  participants Json?      // store participants to generate tickets upon payment approval
   tickets     Ticket[]    
   payment     Payment?
   createdAt   DateTime    @default(now())
@@ -65,7 +67,7 @@ model Ticket {
   name        String
   age         Int
   badgeNumber String?     
-  qrCodeUrl   String?     
+  qrCodeUrl   String?     @db.LongText
   checkedIn   Boolean     @default(false)
   checkedInBy User?       @relation(fields: [checkedInById], references: [id])
   checkedInById Int?      
@@ -77,10 +79,14 @@ model Payment {
   id          Int         @id @default(autoincrement())
   booking     Booking     @relation(fields: [bookingId], references: [id])
   bookingId   Int @unique
-  receiptUrl  String
+  receiptUrl  String      @db.LongText
+  transactionNumber String?
+  bank        String?
+  paymentDate DateTime?
   status      PaymentStatus @default(PENDING)
   approvedBy  User?       @relation(fields: [approvedById], references: [id])
   approvedById Int?
+  rejectionMessage String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 }
@@ -180,4 +186,20 @@ model Otp {
   updatedAt DateTime @updatedAt
 
   @@index([phone, purpose, expiresAt])
+}
+
+enum BankStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Bank {
+  id            Int        @id @default(autoincrement())
+  name          String
+  logoUrl       String?
+  accountName   String
+  accountNumber String
+  status        BankStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 }

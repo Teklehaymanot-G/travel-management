@@ -12,6 +12,7 @@ import CouponManagement from "../components/management/CouponManagement";
 import UserManagement from "../components/management/UserManagement";
 import ActivityLog from "../components/management/ActivityLog";
 import PaymentManagement from "../components/management/PaymentManagement";
+import BankManagement from "../components/management/BankManagement";
 
 const PrivateRoute = ({ roles, children }) => {
   const { user } = useAuth();
@@ -57,6 +58,7 @@ const ManagerAppRouter = () => {
         <Route path="travels/:id" element={<TravelDetailPage />} />
         <Route path="bookings" element={<BookingManagement />} />
         <Route path="payments" element={<PaymentManagement />} />
+        <Route path="banks" element={<BankManagement />} />
 
         {/* Manager-only routes */}
         <Route
