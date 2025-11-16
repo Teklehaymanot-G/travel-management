@@ -2,8 +2,8 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// Root uploads directory
-const uploadsRoot = path.join(process.cwd(), "uploads");
+// Root uploads directory: src/uploads (one level up from middleware)
+const uploadsRoot = path.join(__dirname, "..", "uploads");
 if (!fs.existsSync(uploadsRoot)) fs.mkdirSync(uploadsRoot, { recursive: true });
 
 // Ensure default 'travels' subfolder exists for legacy references

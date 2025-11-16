@@ -74,6 +74,27 @@ const BankManagement = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownOpen]);
 
+  // Helper function to get correct image URL
+  const getImageUrl = (logoPath) => {
+    if (!logoPath) return null;
+
+    // If it's already a full URL, return as is
+    if (logoPath.startsWith("http")) {
+      return logoPath;
+    }
+
+    // If it's a relative path, construct the full URL
+    // Assuming your app is served from the root and uploads are in src/uploads/banks/
+    if (logoPath.startsWith("uploads/") || logoPath.startsWith("/uploads/")) {
+      // Remove leading slash if present
+      const cleanPath = logoPath.startsWith("/") ? logoPath.slice(1) : logoPath;
+      return `/${cleanPath}`;
+    }
+
+    // If it's just a filename, assume it's in the banks directory
+    return `/uploads/banks/${logoPath}`;
+  };
+
   // Statistics and other existing code remains the same...
   const stats = useMemo(() => {
     const total = banks.length;
@@ -423,84 +444,91 @@ const BankManagement = () => {
                 </td>
               </tr>
             ) : paginatedBanks.length ? (
-              paginatedBanks.map((bank, index) => (
-                <tr
-                  key={bank.id}
-                  className={`border-b hover:bg-blue-50 transition-colors ${
-                    index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                  }`}
-                >
-                  <td className="p-3">
-                    {bank.logoUrl ? (
-                      <img
-                        src={bank.logoUrl}
-                        alt={bank.name}
-                        className="h-8 w-8 object-contain rounded"
-                      />
-                    ) : (
-                      <div className="h-8 w-8 bg-gray-200 rounded" />
-                    )}
-                  </td>
-                  <td className="p-3 font-medium">{bank.name}</td>
-                  <td className="p-3">{bank.accountName}</td>
-                  <td className="p-3 font-mono text-xs">
-                    {bank.accountNumber}
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        bank.status === "ACTIVE"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-200 text-gray-600"
-                      }`}
-                    >
-                      {bank.status}
-                    </span>
-                  </td>
-                  <td className="p-3 text-gray-500">
-                    {new Date(bank.updatedAt).toLocaleDateString()}
-                  </td>
-                  <td className="p-3">
-                    <div
-                      className="relative inline-block text-left"
-                      ref={(el) => (dropdownRefs.current[bank.id] = el)}
-                    >
-                      <button
-                        type="button"
-                        className="inline-flex justify-center w-full px-3 py-1.5 bg-white text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-blue-500"
-                        onClick={() => toggleDropdown(bank.id)}
-                      >
-                        Actions ▾
-                      </button>
+              paginatedBanks.map((bank, index) => {
+                const logoUrl = getImageUrl(bank.logoUrl || bank.logo);
 
-                      {dropdownOpen === bank.id && (
-                        <div className="absolute right-0 z-10 mt-2 w-40 rounded-md border border-gray-200 bg-white shadow-lg p-1">
-                          <button
-                            className="w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-100"
-                            onClick={() => openEdit(bank)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="w-full text-left px-3 py-2 text-xs rounded hover:bg-yellow-50 text-yellow-600"
-                            onClick={() => handleToggle(bank)}
-                          >
-                            {bank.status === "ACTIVE"
-                              ? "Deactivate"
-                              : "Activate"}
-                          </button>
-                          <button
-                            className="w-full text-left px-3 py-2 text-xs rounded hover:bg-red-50 text-red-600"
-                            onClick={() => handleDelete(bank)}
-                          >
-                            Delete
-                          </button>
-                        </div>
+                return (
+                  <tr
+                    key={bank.id}
+                    className={`border-b hover:bg-blue-50 transition-colors ${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                    }`}
+                  >
+                    <td className="p-3">
+                      {logoUrl ? (
+                        <img
+                          src={logoUrl}
+                          alt={bank.name}
+                          className="h-8 w-8 object-contain rounded"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="h-8 w-8 bg-gray-200 rounded" />
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="p-3 font-medium">{bank.name}</td>
+                    <td className="p-3">{bank.accountName}</td>
+                    <td className="p-3 font-mono text-xs">
+                      {bank.accountNumber}
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          bank.status === "ACTIVE"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-200 text-gray-600"
+                        }`}
+                      >
+                        {bank.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-gray-500">
+                      {new Date(bank.updatedAt).toLocaleDateString()}
+                    </td>
+                    <td className="p-3">
+                      <div
+                        className="relative inline-block text-left"
+                        ref={(el) => (dropdownRefs.current[bank.id] = el)}
+                      >
+                        <button
+                          type="button"
+                          className="inline-flex justify-center w-full px-3 py-1.5 bg-white text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-blue-500"
+                          onClick={() => toggleDropdown(bank.id)}
+                        >
+                          Actions ▾
+                        </button>
+
+                        {dropdownOpen === bank.id && (
+                          <div className="absolute right-0 z-10 mt-2 w-40 rounded-md border border-gray-200 bg-white shadow-lg p-1">
+                            <button
+                              className="w-full text-left px-3 py-2 text-xs rounded hover:bg-gray-100"
+                              onClick={() => openEdit(bank)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="w-full text-left px-3 py-2 text-xs rounded hover:bg-yellow-50 text-yellow-600"
+                              onClick={() => handleToggle(bank)}
+                            >
+                              {bank.status === "ACTIVE"
+                                ? "Deactivate"
+                                : "Activate"}
+                            </button>
+                            <button
+                              className="w-full text-left px-3 py-2 text-xs rounded hover:bg-red-50 text-red-600"
+                              onClick={() => handleDelete(bank)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td className="p-4 text-center" colSpan={7}>

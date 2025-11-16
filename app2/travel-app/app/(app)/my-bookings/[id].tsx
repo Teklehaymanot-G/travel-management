@@ -23,6 +23,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTranslation } from "react-i18next";
 import * as ImagePicker from "expo-image-picker";
 import Constants from "expo-constants";
+import { resolveImageUrl } from "@/src/utils/image";
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -229,40 +230,6 @@ export default function BookingDetailScreen() {
     } finally {
       setSubmitting(false);
     }
-  };
-  const resolveImageUrl = (raw: any) => {
-    // console.log(raw);
-    if (!raw || (typeof raw === "string" && !raw.trim())) return null;
-    const normalized = String(raw).replace(/\\/g, "/"); // handle Windows backslashes
-    if (/^https?:\/\//i.test(normalized)) return normalized; // already absolute
-    // Strip query/hash early (not expected but safe)
-    const withoutQuery = normalized.split(/[?#]/)[0];
-    // Normalize leading slashes and ./
-    const cleaned = withoutQuery.replace(/^\.\/+/, "").replace(/^\/+/, "");
-    // Remove accidental leading "uploads/" duplication (e.g., uploads/uploads/travels/...)
-    const deduped = cleaned.replace(/^uploads\/uploads\//, "uploads/");
-    // Ensure begins with uploads/
-    const path = deduped.startsWith("uploads/")
-      ? deduped
-      : `uploads/${deduped}`;
-    const envBase =
-      (process?.env as any)?.EXPO_PUBLIC_API_URL ||
-      (Constants?.expoConfig?.extra as any)?.API_URL ||
-      (Constants?.expoConfig?.extra as any)?.apiUrl ||
-      "http://localhost:5000/api";
-    const base = String(envBase).replace(/\/$/, "");
-    const root = base.endsWith("/api") ? base.slice(0, -4) : base;
-    const resolved = `${root}/${path}`;
-    if (__DEV__) {
-      console.debug("[TravelCard] resolveImageUrl", {
-        raw,
-        normalized,
-        cleaned,
-        deduped,
-        resolved,
-      });
-    }
-    return resolved;
   };
 
   if (loading) {
@@ -658,23 +625,21 @@ export default function BookingDetailScreen() {
                   <Text style={styles.itemText}>
                     {ticket.name} • #{ticket.badgeNumber || ticket.id}
                   </Text>
-                  {ticket.qrCodeUrl ? (
-                    <Image
-                      source={{
-                        uri: ticket.qrCodeUrl.startsWith("http")
-                          ? ticket.qrCodeUrl
-                          : ticket.qrCodeUrl.startsWith("data:image")
-                          ? ticket.qrCodeUrl
-                          : `data:image/png;base64,${ticket.qrCodeUrl}`,
-                      }}
-                      style={{ width: 160, height: 160 }}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <Text style={styles.muted}>
-                      {t("qr_generation_pending") || "QR generation pending"}
-                    </Text>
-                  )}
+
+                  {(() => {
+                    const qrUri = resolveImageUrl(ticket.qrCodeUrl);
+                    return qrUri ? (
+                      <Image
+                        source={{ uri: qrUri }}
+                        style={{ width: 160, height: 160 }}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={styles.muted}>
+                        {t("qr_generation_pending") || "QR generation pending"}
+                      </Text>
+                    );
+                  })()}
                 </View>
               ))
             ) : (

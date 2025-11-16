@@ -30,39 +30,54 @@ const getPayments = async (req, res, next) => {
       where.status = status;
     }
 
-    const payments = await prisma.payment.findMany({
-      where,
-      include: {
-        booking: {
-          include: {
-            travel: {
-              select: {
-                id: true,
-                title: true,
-              },
-            },
-            traveler: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-              },
+    let payments;
+    try {
+      payments = await prisma.payment.findMany({
+        where,
+        include: {
+          booking: {
+            include: {
+              travel: { select: { id: true, title: true } },
+              traveler: { select: { id: true, name: true, phone: true } },
             },
           },
+          approvedBy: { select: { id: true, name: true } },
         },
-        approvedBy: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-      skip: (page - 1) * limit,
-      take: parseInt(limit),
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        skip: (page - 1) * limit,
+        take: parseInt(limit),
+        orderBy: { createdAt: "desc" },
+      });
+    } catch (e) {
+      // Handle orphaned payments referencing missing booking rows
+      if (
+        typeof e?.message === "string" &&
+        e.message.includes("Field booking is required")
+      ) {
+        try {
+          await prisma.$executeRaw`DELETE FROM Payment WHERE bookingId NOT IN (SELECT id FROM Booking)`;
+          payments = await prisma.payment.findMany({
+            where,
+            include: {
+              booking: {
+                include: {
+                  travel: { select: { id: true, title: true } },
+                  traveler: { select: { id: true, name: true, phone: true } },
+                },
+              },
+              approvedBy: { select: { id: true, name: true } },
+            },
+            skip: (page - 1) * limit,
+            take: parseInt(limit),
+            orderBy: { createdAt: "desc" },
+          });
+        } catch (cleanupErr) {
+          console.error("Payment orphan cleanup failed", cleanupErr.message);
+          throw e; // rethrow original error
+        }
+      } else {
+        throw e;
+      }
+    }
 
     const total = await prisma.payment.count({ where });
 
@@ -328,6 +343,7 @@ const updatePaymentStatus = async (req, res, next) => {
         }
 
         // Ensure ticket uploads directory exists (for file-based QR fallback/storage)
+        // Store tickets under src/uploads/tickets (one level up from controllers)
         const uploadsDir = path.join(__dirname, "..", "uploads", "tickets");
         try {
           if (!fs.existsSync(uploadsDir)) {
@@ -355,7 +371,8 @@ const updatePaymentStatus = async (req, res, next) => {
                 }_${Date.now()}.png`;
                 const filePath = path.join(uploadsDir, fileName);
                 fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
-                storedQr = `${baseUrl}/uploads/tickets/${fileName}`;
+                // Store relative URL; clients prepend their own base origin
+                storedQr = `/uploads/tickets/${fileName}`;
               } catch (e) {
                 console.warn(
                   "QR file write failed; falling back to data URI",

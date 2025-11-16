@@ -320,10 +320,6 @@ export default function TravelDetailScreen() {
     </View>
   );
 
-  // Legacy placeholder removed; real like/unlike implemented.
-
-  console.log("travel", resolveImageUrl(travel.imageUrl));
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}

@@ -10,6 +10,7 @@ import AppButton from "../../components/common/AppButton.js";
 import { getMyBookings } from "../../services/bookingService";
 import theme from "../../config/theme";
 import { isRTL } from "../../utils/rtl";
+import { useState } from "react";
 
 const BookingConfirmationScreen = ({ route, navigation }) => {
   const { t } = useTranslation();

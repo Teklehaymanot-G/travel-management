@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require("path");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
@@ -75,7 +76,8 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Static files
-app.use("/uploads", express.static("uploads"));
+// Serve uploads from src/uploads (align with actual storage location)
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Routes
 app.use("/api/auth", authRoutes);
