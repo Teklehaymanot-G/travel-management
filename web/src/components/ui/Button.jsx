@@ -1,5 +1,3 @@
-import React from "react";
-
 const Button = ({
   children,
   onClick,
@@ -10,10 +8,15 @@ const Button = ({
   type = "button",
 }) => {
   const variants = {
-    primary: "bg-blue-600 hover:bg-blue-700 text-white",
-    secondary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
-    warning: "bg-yellow-500 hover:bg-yellow-600 text-white",
-    danger: "bg-red-600 hover:bg-red-700 text-white",
+    primary: "btn-base btn-primary",
+    secondary:
+      "btn-base btn-outline-none bg-white hover:bg-gray-100 text-gray-700 border border-gray-300",
+    danger:
+      "btn-base bg-red-600 hover:bg-red-500 text-white focus:outline-none focus:ring-2 focus:ring-red-400",
+    warning:
+      "btn-base bg-amber-500 hover:bg-amber-400 text-white focus:outline-none focus:ring-2 focus:ring-amber-300",
+    ghost:
+      "btn-base bg-transparent text-[var(--color-neutral-600)] hover:bg-[var(--color-neutral-100)]",
   };
 
   return (
@@ -22,10 +25,7 @@ const Button = ({
       onClick={onClick}
       disabled={disabled}
       className={`
-        px-4 py-2 rounded-md font-medium text-sm
-        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-        transition-colors duration-200
-        ${variants[variant]}
+        ${variants[variant] || variants.primary}
         ${fullWidth ? "w-full" : ""}
         ${disabled ? "opacity-50 cursor-not-allowed" : ""}
         ${className}

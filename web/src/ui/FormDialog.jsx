@@ -19,6 +19,7 @@ const FormDialog = ({
   submitVariant = "primary", // primary | danger
   footerContent = null, // custom extra footer content (left side)
   stickyFooter = true,
+  overlayClass = "bg-black/30 dark:bg-black/50 backdrop-blur-[2px]",
 }) => {
   const sizeClasses = {
     sm: "max-w-sm",
@@ -43,7 +44,7 @@ const FormDialog = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className={`fixed inset-0 ${overlayClass}`} />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">

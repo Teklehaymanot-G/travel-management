@@ -13,6 +13,10 @@ import UserManagement from "../components/management/UserManagement";
 import ActivityLog from "../components/management/ActivityLog";
 import PaymentManagement from "../components/management/PaymentManagement";
 import BankManagement from "../components/management/BankManagement";
+import ReportsDashboard from "../components/management/ReportsDashboard";
+import WitnessManagement from "../components/management/WitnessManagement";
+import WitnessDetail from "../pages/public/WitnessDetail";
+import ManagerDashboard from "../components/dashboard/ManagerDashboard";
 
 const PrivateRoute = ({ roles, children }) => {
   const { user } = useAuth();
@@ -53,12 +57,16 @@ const ManagerAppRouter = () => {
         <Route path="supervisor" element={<SupervisorPage />} />
 
         {/* Shared routes */}
+        <Route path="dashboard" element={<ManagerDashboard />} />
         <Route path="travels" element={<TravelListPage />} />
         <Route path="travels/new" element={<TravelCreatePage />} />
         <Route path="travels/:id" element={<TravelDetailPage />} />
         <Route path="bookings" element={<BookingManagement />} />
         <Route path="payments" element={<PaymentManagement />} />
         <Route path="banks" element={<BankManagement />} />
+        <Route path="witnesses" element={<WitnessManagement />} />
+        <Route path="witnesses/:id" element={<WitnessDetail />} />
+        <Route path="reports" element={<ReportsDashboard />} />
 
         {/* Manager-only routes */}
         <Route

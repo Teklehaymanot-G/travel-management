@@ -358,10 +358,14 @@ const updatePaymentStatus = async (req, res, next) => {
         const ticketCreates = await Promise.all(
           participants.map(async (p, idx) => {
             const badgeNumber = generateBadgeNumber();
-            const qrCodeData = `BOOKING:${payment.bookingId}-IDX:${
+            const rawPayload = `BOOKING:${payment.bookingId}-IDX:${
               idx + 1
             }-NAME:${p.name}`;
-            let qrCodeDataUrl = await generateQRCode(qrCodeData);
+            // Encode payload (base64) before generating QR code
+            const encodedPayload = Buffer.from(rawPayload, "utf8").toString(
+              "base64"
+            );
+            let qrCodeDataUrl = await generateQRCode(encodedPayload);
             let storedQr = qrCodeDataUrl; // default to data URI
             if (qrCodeDataUrl && qrCodeDataUrl.startsWith("data:image")) {
               try {

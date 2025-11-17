@@ -1,15 +1,17 @@
-import React from "react";
-import { NavLink } from "react-router-dom";
+import React, { useEffect } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
 const Sidebar = () => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const role = (user?.role ?? "").toString().trim().toUpperCase();
 
   const navigation = [
     {
       name: "Dashboard",
-      href: "/admin",
+      href: "/admin/dashboard",
       icon: "dashboard",
       roles: ["MANAGER", "SUPERVISOR"],
     },
@@ -19,12 +21,12 @@ const Sidebar = () => {
       icon: "travel",
       roles: ["MANAGER"],
     },
-    {
-      name: "Booking Management",
-      href: "/admin/bookings",
-      icon: "booking",
-      roles: ["MANAGER", "SUPERVISOR"],
-    },
+    // {
+    //   name: "Booking Management",
+    //   href: "/admin/bookings",
+    //   icon: "booking",
+    //   roles: ["MANAGER", "SUPERVISOR"],
+    // },
     {
       name: "Coupon Management",
       href: "/admin/coupons",
@@ -35,6 +37,12 @@ const Sidebar = () => {
       name: "Payment Management",
       href: "/admin/payments",
       icon: "payment",
+      roles: ["MANAGER", "SUPERVISOR"],
+    },
+    {
+      name: "Witness Management",
+      href: "/admin/witnesses",
+      icon: "witness",
       roles: ["MANAGER", "SUPERVISOR"],
     },
     {
@@ -50,11 +58,17 @@ const Sidebar = () => {
       roles: ["MANAGER"],
     },
     {
-      name: "Activity Log",
-      href: "/admin/activity",
-      icon: "activity",
-      roles: ["MANAGER"],
+      name: "Reports",
+      href: "/admin/reports",
+      icon: "reports",
+      roles: ["MANAGER", "SUPERVISOR"],
     },
+    // {
+    //   name: "Activity Log",
+    //   href: "/admin/activity",
+    //   icon: "activity",
+    //   roles: ["MANAGER"],
+    // },
   ];
 
   // Traveler-specific menu
@@ -207,6 +221,40 @@ const Sidebar = () => {
             />
           </svg>
         );
+      case "reports":
+        return (
+          <svg
+            className="h-6 w-6"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 17v-6a1 1 0 011-1h0a1 1 0 011 1v6m4 0V7a1 1 0 011-1h0a1 1 0 011 1v10M5 17v-2a1 1 0 011-1h0a1 1 0 011 1v2"
+            />
+          </svg>
+        );
+      case "witness":
+        return (
+          <svg
+            className="h-6 w-6"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11 5l6 4-6 4V5zM5 6h2v12H5a2 2 0 01-2-2V8a2 2 0 012-2z"
+            />
+          </svg>
+        );
       default:
         return (
           <svg
@@ -226,6 +274,41 @@ const Sidebar = () => {
         );
     }
   };
+
+  // Persist last visited route (admin or traveler) and restore on root visit
+  useEffect(() => {
+    const path = location.pathname;
+    if (role === "TRAVELER") {
+      // Only persist non-root travel routes to avoid overwriting stored last route when landing on /travel
+      if (path.startsWith("/travel") && path !== "/travel") {
+        localStorage.setItem("lastTravelRoute", path);
+      }
+      // Restore traveler route if landing exactly on /travel
+      if (path === "/travel") {
+        const storedTravel = localStorage.getItem("lastTravelRoute");
+        if (storedTravel && storedTravel !== path) {
+          navigate(storedTravel, { replace: true });
+        }
+      }
+      return;
+    }
+
+    // Manager/Supervisor logic
+    if (path.startsWith("/admin") && path !== "/admin") {
+      // Only store if path matches a permitted menu entry and is not the root /admin
+      const allowed = menu.filter((m) => m.roles.includes(role));
+      if (allowed.some((m) => path.startsWith(m.href))) {
+        localStorage.setItem("lastAdminRoute", path);
+      }
+    }
+    // If user hits bare /admin, redirect to stored last route
+    if (path === "/admin") {
+      const stored = localStorage.getItem("lastAdminRoute");
+      if (stored && stored !== path) {
+        navigate(stored, { replace: true });
+      }
+    }
+  }, [location.pathname, role, navigate, menu]);
 
   return (
     <div className="hidden md:flex md:flex-shrink-0">

@@ -98,6 +98,17 @@ const getTravel = async (req, res, next) => {
             },
           },
         },
+        bookings: {
+          include: {
+            payment: {
+              select: {
+                id: true,
+                finalAmount: true,
+                status: true,
+              },
+            },
+          },
+        },
         documents: true,
         comments: {
           include: {

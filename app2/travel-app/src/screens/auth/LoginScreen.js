@@ -196,7 +196,11 @@ const LoginScreen = () => {
           <View style={styles.footer}>
             <View style={styles.accountContainer}>
               <Text style={styles.accountText}>{t("dont_have_account")}</Text>
-              <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+              <TouchableOpacity
+                style={styles.accountLinkWrapper}
+                onPress={() => router.push("/(auth)/register")}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.accountLink}>{t("create_account")}</Text>
               </TouchableOpacity>
             </View>
@@ -329,24 +333,40 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: "center",
+    marginTop: 8,
   },
   accountContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginBottom: 24,
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 24,
+    shadowColor: "#94a3b8",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   accountText: {
     fontSize: 14,
-    color: "#ffffff",
-    opacity: 0.9,
-    marginRight: 8,
+    color: "#475569",
+    marginRight: 6,
+    fontWeight: "500",
   },
   accountLink: {
     fontSize: 14,
-    color: "#ffffff",
+    color: "#667eea",
     fontWeight: "700",
-    textDecorationLine: "underline",
+    letterSpacing: 0.3,
+  },
+  accountLinkWrapper: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: "#eef2ff",
   },
 });
 

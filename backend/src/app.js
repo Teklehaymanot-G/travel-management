@@ -18,6 +18,10 @@ const documentRoutes = require("./routes/documents");
 const commentRoutes = require("./routes/comments");
 const couponRoutes = require("./routes/coupons");
 const roleRoutes = require("./routes/roles"); // Add this line
+const ticketRoutes = require("./routes/tickets");
+const reportRoutes = require("./routes/reports");
+const witnessRoutes = require("./routes/witnesses");
+const analyticsRoutes = require("./routes/analytics");
 
 // Import middleware
 const authMiddleware = require("./middleware/auth");
@@ -91,6 +95,10 @@ app.use("/api/documents", documentRoutes); // Updated - some routes are public
 app.use("/api/comments", commentRoutes); // Updated - some routes are public
 app.use("/api/roles", authMiddleware, roleRoutes); // Add this line
 app.use("/api/coupons", couponRoutes);
+app.use("/api/tickets", authMiddleware, ticketRoutes);
+app.use("/api/reports", authMiddleware, reportRoutes);
+app.use("/api/witnesses", witnessRoutes);
+app.use("/api/analytics", authMiddleware, analyticsRoutes);
 
 // Health Check
 app.get("/api/health", (req, res) => {

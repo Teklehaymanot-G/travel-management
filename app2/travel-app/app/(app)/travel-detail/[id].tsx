@@ -523,6 +523,17 @@ export default function TravelDetailScreen() {
             <Text style={styles.totalLabel}>{t("total_per_person")}</Text>
           </View>
 
+          {/* Scan tickets button for supervisor/manager roles */}
+          {user?.role && ["SUPERVISOR", "MANAGER"].includes(user.role) && (
+            <TouchableOpacity
+              onPress={() => router.push("/(app)/scan-ticket")}
+              activeOpacity={0.85}
+              style={styles.scanButton}
+            >
+              <Text style={styles.scanButtonText}>{t("scan") || "Scan"}</Text>
+            </TouchableOpacity>
+          )}
+
           <AppButton
             title={t("book_now")}
             onPress={handleBookNow}
@@ -749,6 +760,19 @@ const styles = StyleSheet.create({
   bookButton: {
     flex: 1,
     marginLeft: 16,
+  },
+  scanButton: {
+    backgroundColor: "#667eea",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginLeft: 16,
+  },
+  scanButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.3,
   },
   // Comments Styles
   commentsPreview: {

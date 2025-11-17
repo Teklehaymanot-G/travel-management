@@ -70,6 +70,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="witness"
+        options={{
+          title: t("witness") || "Witness",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="megaphone" color={color} size={size} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

@@ -600,6 +600,25 @@ export default function BookingDetailScreen() {
               <Text style={styles.sectionTitle}>
                 {t("tickets") || "Tickets"}
               </Text>
+              {/* Scan button for supervisor/manager */}
+              {booking?.traveler?.role &&
+                ["SUPERVISOR", "MANAGER"].includes(booking.traveler.role) && (
+                  <TouchableOpacity
+                    onPress={() => router.push("/(app)/scan-ticket")}
+                    style={{
+                      backgroundColor: "#667eea",
+                      paddingVertical: 6,
+                      paddingHorizontal: 14,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Text
+                      style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+                    >
+                      {t("scan") || "Scan"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               <TouchableOpacity
                 onPress={load}
                 style={{

@@ -1,7 +1,7 @@
 // Centralized image host configuration
 // Priority of environment variables (first non-empty wins):
-// 1) IMAGE_BASE_URL (e.g., http://192.168.8.62:5000)
-// 2) API_BASE_URL   (e.g., http://192.168.8.62:5000)
+// 1) IMAGE_BASE_URL (e.g., http://192.168.100.54:5000)
+// 2) API_BASE_URL   (e.g., http://192.168.100.54:5000)
 // 3) IMAGE_PROTOCOL + IMAGE_HOST [+ IMAGE_PORT]
 // 4) Fallback to request-derived protocol/host
 
