@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import AppButton from "../../components/common/AppButton";
+import * as Clipboard from "expo-clipboard";
+import { getBanks } from "../../services/bankService";
 import theme from "../../config/theme";
 import { validateCoupon, createPayment } from "../../services/paymentService";
 
@@ -35,6 +37,25 @@ const PaymentScreen = ({ route, navigation }) => {
 
   const finalAmount = couponInfo?.data?.finalAmount ?? baseAmount;
   const discountAmount = couponInfo?.data?.discountAmount ?? 0;
+
+  const [banks, setBanks] = useState([]);
+  const [banksLoading, setBanksLoading] = useState(false);
+  const [copied, setCopied] = useState("");
+
+  useEffect(() => {
+    const loadBanks = async () => {
+      setBanksLoading(true);
+      try {
+        const res = await getBanks({ status: "ACTIVE" });
+        setBanks(res?.data || []);
+      } catch (e) {
+        // ignore for now
+      } finally {
+        setBanksLoading(false);
+      }
+    };
+    loadBanks();
+  }, []);
 
   const onApplyCoupon = async () => {
     setCouponError("");
@@ -148,6 +169,22 @@ const PaymentScreen = ({ route, navigation }) => {
         )}
       </View>
 
+      {/* Participants Details */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>
+          {t("participants") || "Participants"}
+        </Text>
+        {(booking?.participants || []).map((p, idx) => (
+          <View key={idx} style={styles.rowBetween}>
+            <Text style={styles.value}>{p.name}</Text>
+            <Text style={styles.label}>
+              {p.ageGroup ? `Age: ${p.ageGroup}` : `Age: ${p.age}`}{" "}
+              {p.gender ? `• ${p.gender}` : ""}
+            </Text>
+          </View>
+        ))}
+      </View>
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
           {t("bank_transfer") || "Bank Transfer"}
@@ -155,12 +192,43 @@ const PaymentScreen = ({ route, navigation }) => {
         <Text style={styles.helperText}>
           {t("bank_transfer_description") || "Transfer to our bank account"}
         </Text>
-        <TextInput
-          placeholder={t("bank") || "Bank"}
-          value={bank}
-          onChangeText={setBank}
-          style={styles.input}
-        />
+
+        {banksLoading ? (
+          <Text style={styles.helperText}>Loading banks...</Text>
+        ) : (
+          banks.map((b) => (
+            <View key={b.id} style={styles.bankRow}>
+              <TouchableOpacity
+                style={[
+                  styles.bankOption,
+                  bank === b.name && styles.bankOptionActive,
+                ]}
+                onPress={() => setBank(b.name)}
+              >
+                <Text style={styles.bankName}>{b.name}</Text>
+                <View style={styles.accountRow}>
+                  <Text style={styles.accountNumber}>{b.accountNumber}</Text>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      await Clipboard.setStringAsync(
+                        String(b.accountNumber || "")
+                      );
+                      setCopied(b.accountNumber);
+                      setTimeout(() => setCopied(""), 1500);
+                    }}
+                    style={styles.copyBtn}
+                  >
+                    <Text style={styles.copyIcon}>📋</Text>
+                  </TouchableOpacity>
+                </View>
+                {copied === b.accountNumber && (
+                  <Text style={styles.copiedText}>Copied</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+
         <TextInput
           placeholder={
             t("enter_transaction_number") || "Enter transaction number"
@@ -252,6 +320,27 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.s,
   },
   successText: { color: theme.colors.success || "#009966" },
+  bankRow: { marginBottom: 8 },
+  bankOption: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.medium,
+    borderWidth: 1,
+    borderColor: theme.colors.grayLight,
+    padding: theme.spacing.m,
+  },
+  bankOptionActive: {
+    borderColor: theme.colors.primary,
+  },
+  bankName: { fontWeight: "bold", color: theme.colors.dark, marginBottom: 4 },
+  accountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  accountNumber: { color: theme.colors.gray },
+  copyBtn: { marginLeft: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  copyIcon: { fontSize: 16 },
+  copiedText: { color: theme.colors.success || "#009966", marginTop: 4 },
 });
 
 export default PaymentScreen;

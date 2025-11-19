@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { createPayment } from "@/src/services/paymentService";
 import * as ImagePicker from "expo-image-picker";
 import { t } from "i18next";
@@ -28,6 +29,7 @@ const PaymentSection = ({ bookingId }: PaymentSectionProps) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   // Bank account details
+  const [copiedAccount, setCopiedAccount] = useState<string>("");
   const bankAccounts = [
     {
       id: "1",
@@ -179,10 +181,25 @@ const PaymentSection = ({ bookingId }: PaymentSectionProps) => {
             <Text style={styles.detailLabel}>{t("account_name")}:</Text>
             <Text style={styles.detailValue}>{account.accountName}</Text>
           </View>
-          <View style={styles.accountDetail}>
+          <View style={[styles.accountDetail, { alignItems: "center" }]}>
             <Text style={styles.detailLabel}>{t("account_number")}:</Text>
-            <Text style={styles.detailValue}>{account.accountNumber}</Text>
+            <View style={styles.accountNumberRow}>
+              <Text style={styles.detailValue}>{account.accountNumber}</Text>
+              <TouchableOpacity
+                style={styles.copyButton}
+                onPress={async () => {
+                  await Clipboard.setStringAsync(account.accountNumber);
+                  setCopiedAccount(account.accountNumber);
+                  setTimeout(() => setCopiedAccount(""), 1500);
+                }}
+              >
+                <Ionicons name="copy" size={18} color="#667eea" />
+              </TouchableOpacity>
+            </View>
           </View>
+          {copiedAccount === account.accountNumber && (
+            <Text style={styles.copiedText}>{t("copied") || "Copied"}</Text>
+          )}
           <View style={styles.accountDetail}>
             <Text style={styles.detailLabel}>{t("branch")}:</Text>
             <Text style={styles.detailValue}>{account.branch}</Text>
@@ -460,6 +477,23 @@ const styles = StyleSheet.create({
     color: "#2d3748",
     fontWeight: "500",
     flex: 1,
+  },
+  accountNumberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  copyButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: "#eef2ff",
+    borderRadius: 6,
+  },
+  copiedText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#667eea",
+    fontWeight: "500",
   },
   continueButton: {
     backgroundColor: "#667eea",

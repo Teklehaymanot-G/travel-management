@@ -1,4 +1,4 @@
-import { Formik } from "formik";
+import { FieldArray, Formik } from "formik";
 import { useState } from "react";
 import {
   ScrollView,
@@ -12,15 +12,16 @@ import * as Yup from "yup";
 import AppButton from "../../components/common/AppButton.js";
 import { createBooking } from "../../services/bookingService";
 import theme from "../../config/theme";
+import TravelerForm from "../../components/booking/TravelerForm";
 
 const validationSchema = Yup.object().shape({
   travelers: Yup.array().of(
     Yup.object().shape({
       name: Yup.string().required("Name is required"),
-      age: Yup.number()
-        .required("Age is required")
-        .min(1, "Age must be at least 1")
-        .max(120, "Age must be less than 120"),
+      ageGroup: Yup.string().required("Age group is required"),
+      gender: Yup.string()
+        .oneOf(["Male", "Female"])
+        .required("Gender is required"),
     })
   ),
 });
@@ -50,7 +51,11 @@ const BookingScreen = ({ route, navigation }) => {
   };
 
   const initialValues = {
-    travelers: Array(travelerCount).fill({ name: "", age: "" }),
+    travelers: Array.from({ length: travelerCount }).map(() => ({
+      name: "",
+      ageGroup: "",
+      gender: "",
+    })),
   };
 
   return (
@@ -84,18 +89,26 @@ const BookingScreen = ({ route, navigation }) => {
         initialValues={initialValues}
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
+        enableReinitialize
       >
-        {({ handleSubmit, values }) => (
+        {({ handleSubmit, values, setFieldValue }) => (
           <>
-            {/* <View style={styles.travelersContainer}>
-              {values.travelers.map((_, index) => (
-                <TravelerForm
-                  key={index}
-                  index={index}
-                  travelerCount={travelerCount}
-                />
-              ))}
-            </View> */}
+            <View style={styles.travelersContainer}>
+              <FieldArray name="travelers">
+                {() => (
+                  <>
+                    {Array.from({ length: travelerCount }).map((_, index) => (
+                      <TravelerForm
+                        key={index}
+                        index={index}
+                        values={values}
+                        setFieldValue={setFieldValue}
+                      />
+                    ))}
+                  </>
+                )}
+              </FieldArray>
+            </View>
 
             <View style={styles.summary}>
               <View style={styles.summaryRow}>

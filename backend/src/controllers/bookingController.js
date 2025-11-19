@@ -40,6 +40,7 @@ const getUserBookings = async (req, res, next) => {
             startDate: true,
             endDate: true,
             price: true,
+            imageUrl: true,
           },
         },
         tickets: true,
@@ -150,10 +151,27 @@ const createBooking = async (req, res, next) => {
         travelId: parseInt(travelId),
         status: "PENDING",
         participants: Array.isArray(travelers)
-          ? travelers.map((t) => ({
-              name: String(t?.name || "Traveler"),
-              age: Number.parseInt(t?.age || 18),
-            }))
+          ? travelers.map((t) => {
+              const ageGroup = t?.ageGroup || null;
+              const gender = t?.gender || null;
+              let ageValue = Number.parseInt(t?.age || 0);
+              if (!ageValue || Number.isNaN(ageValue)) {
+                // derive representative age from group
+                const group = String(ageGroup || "").trim();
+                if (group === "<10") ageValue = 8;
+                else if (group === "10-18") ageValue = 14;
+                else if (group === "18-35") ageValue = 26;
+                else if (group === "35-50") ageValue = 42;
+                else if (group === ">50") ageValue = 55;
+                else ageValue = 18;
+              }
+              return {
+                name: String(t?.name || "Traveler"),
+                age: ageValue,
+                ageGroup: ageGroup,
+                gender: gender,
+              };
+            })
           : undefined,
       },
       include: {

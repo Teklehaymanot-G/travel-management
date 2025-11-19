@@ -3,6 +3,7 @@
 import LoadingIndicator from "@/src/components/common/LoadingIndicator";
 import { useAuth } from "@/src/context/AuthContext";
 import { getMyBookings, cancelBooking } from "@/src/services/bookingService";
+import { resolveImageUrl } from "@/src/utils/image";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,6 +27,7 @@ export default function MyTicketsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("all"); // all | PENDING | APPROVED | REJECTED
   const [bookings, setBookings] = useState<any[]>([]);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const load = async (status: string, isRefresh = false) => {
     try {
@@ -156,9 +158,7 @@ export default function MyTicketsScreen() {
           filteredBookings.map((b) => (
             <View key={b.id} style={styles.ticketCard}>
               <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=300",
-                }}
+                source={{ uri: resolveImageUrl(b?.travel?.imageUrl) || "" }}
                 style={styles.ticketImage}
                 resizeMode="cover"
               />
@@ -219,58 +219,109 @@ export default function MyTicketsScreen() {
                   )}
                 </View>
 
-                {b.tickets?.length > 0 && (
-                  <View style={{ marginTop: 12 }}>
-                    <Text
-                      style={{
-                        fontWeight: "600",
-                        color: "#1a202c",
-                        marginBottom: 8,
-                      }}
-                    >
-                      {t("tickets")}
-                    </Text>
-                    {b.tickets.map((tk: any) => (
+                {(() => {
+                  const count = Array.isArray(b.tickets) ? b.tickets.length : 0;
+                  const isOpen = !!expanded[String(b.id)];
+                  return (
+                    <View style={{ marginTop: 12 }}>
                       <View
-                        key={tk.id}
                         style={{
-                          borderWidth: 1,
-                          borderColor: "#e2e8f0",
-                          borderRadius: 8,
-                          padding: 12,
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
                           marginBottom: 8,
-                          backgroundColor: "#ffffff",
                         }}
                       >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            justifyContent: "space-between",
-                            marginBottom: 8,
-                          }}
-                        >
-                          <Text style={{ fontWeight: "600", color: "#2d3748" }}>
-                            {tk.name}
-                          </Text>
-                          <Text style={{ color: "#718096" }}>Age {tk.age}</Text>
-                        </View>
-                        <Text style={{ color: "#718096", marginBottom: 8 }}>
-                          Badge: {tk.badgeNumber}
+                        <Text style={{ fontWeight: "600", color: "#1a202c" }}>
+                          {(t("tickets") || "Tickets") + ` (${count})`}
                         </Text>
-                        {tk.qrCodeUrl ? (
-                          <Image
-                            source={{ uri: tk.qrCodeUrl }}
+                        {count > 0 ? (
+                          <TouchableOpacity
+                            onPress={() =>
+                              setExpanded((prev) => ({
+                                ...prev,
+                                [String(b.id)]: !prev[String(b.id)],
+                              }))
+                            }
                             style={{
-                              width: 160,
-                              height: 160,
-                              alignSelf: "center",
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 8,
+                              backgroundColor: isOpen ? "#e6fffa" : "#f7fafc",
+                              borderWidth: 1,
+                              borderColor: isOpen ? "#38b2ac" : "#e2e8f0",
                             }}
-                          />
+                          >
+                            <Text
+                              style={{
+                                color: isOpen ? "#2c7a7b" : "#2b6cb0",
+                                fontWeight: "600",
+                              }}
+                            >
+                              {isOpen
+                                ? t("hide") || "Hide"
+                                : t("show") || "Show"}
+                            </Text>
+                          </TouchableOpacity>
                         ) : null}
                       </View>
-                    ))}
-                  </View>
-                )}
+                      {isOpen && count > 0
+                        ? b.tickets.map((tk: any) => (
+                            <View
+                              key={tk.id}
+                              style={{
+                                borderWidth: 1,
+                                borderColor: "#e2e8f0",
+                                borderRadius: 8,
+                                padding: 12,
+                                marginBottom: 8,
+                                backgroundColor: "#ffffff",
+                              }}
+                            >
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  justifyContent: "space-between",
+                                  marginBottom: 8,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontWeight: "600",
+                                    color: "#2d3748",
+                                  }}
+                                >
+                                  {tk.name}
+                                </Text>
+                                <Text style={{ color: "#718096" }}>
+                                  {tk.ageGroup
+                                    ? `Age ${tk.ageGroup}`
+                                    : `Age ${tk.age ?? "-"}`}
+                                </Text>
+                              </View>
+                              <Text
+                                style={{ color: "#718096", marginBottom: 8 }}
+                              >
+                                Badge: {tk.badgeNumber}
+                              </Text>
+                              {tk.qrCodeUrl ? (
+                                <Image
+                                  source={{
+                                    uri: resolveImageUrl(tk.qrCodeUrl) || "",
+                                  }}
+                                  style={{
+                                    width: 160,
+                                    height: 160,
+                                    alignSelf: "center",
+                                  }}
+                                />
+                              ) : null}
+                            </View>
+                          ))
+                        : null}
+                    </View>
+                  );
+                })()}
               </View>
             </View>
           ))

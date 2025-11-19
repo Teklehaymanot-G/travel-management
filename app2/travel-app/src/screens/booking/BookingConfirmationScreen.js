@@ -98,9 +98,18 @@ const BookingConfirmationScreen = ({ route, navigation }) => {
         {travelers.map((traveler, index) => (
           <View key={index} style={styles.travelerItem}>
             <Text style={styles.travelerName}>{traveler.name}</Text>
-            <Text style={styles.travelerAge}>
-              {t("age")}: {traveler.age}
-            </Text>
+            {traveler.ageGroup ? (
+              <Text style={styles.travelerAge}>
+                Age Group: {traveler.ageGroup}
+              </Text>
+            ) : (
+              <Text style={styles.travelerAge}>
+                {t("age")}: {traveler.age}
+              </Text>
+            )}
+            {traveler.gender ? (
+              <Text style={styles.travelerAge}>Gender: {traveler.gender}</Text>
+            ) : null}
           </View>
         ))}
       </View>

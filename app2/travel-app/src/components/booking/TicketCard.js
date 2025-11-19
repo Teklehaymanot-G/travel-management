@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import theme from "../../config/theme";
 import Badge from "../ui/Badge";
 
@@ -33,14 +33,15 @@ const TicketCard = ({ ticket, onPress }) => {
           <Text style={styles.badgeNumber}>Badge: {ticket.badgeNumber}</Text>
         </View>
 
-        {/* <View style={styles.qrContainer}>
-          <QRCode
-            value={ticket.qrCodeData}
-            size={80}
-            fgColor={theme.colors.dark}
-            bgColor={theme.colors.white}
-          />
-        </View> */}
+        {ticket.qrCodeUrl ? (
+          <View style={styles.qrContainer}>
+            <Image
+              source={{ uri: ticket.qrCodeUrl }}
+              style={{ width: 120, height: 120, borderRadius: 8 }}
+              resizeMode="cover"
+            />
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.footer}>

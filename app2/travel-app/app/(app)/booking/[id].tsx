@@ -31,9 +31,11 @@ export default function BookingScreen() {
 
   const [travelers, setTravelers] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const AGE_GROUPS = ["<10", "10-18", "18-35", "35-50", ">50"];
+  const GENDERS = ["Male", "Female"];
   const [participants, setParticipants] = useState<
-    { name: string; age: string }[]
-  >([{ name: "", age: "18" }]);
+    { name: string; ageGroup: string; gender: string }[]
+  >([{ name: "", ageGroup: "18-35", gender: "Male" }]);
   // Payment is not handled here anymore
 
   useEffect(() => {
@@ -56,9 +58,8 @@ export default function BookingScreen() {
     setParticipants((prev) => {
       const arr = [...prev];
       if (travelers > arr.length) {
-        // add new default entries
         for (let i = arr.length; i < travelers; i++) {
-          arr.push({ name: "", age: "18" });
+          arr.push({ name: "", ageGroup: "18-35", gender: "Male" });
         }
       } else if (travelers < arr.length) {
         arr.length = travelers;
@@ -99,7 +100,8 @@ export default function BookingScreen() {
       // Build travelers payload; default names if empty
       const payloadTravelers = participants.map((p, idx) => ({
         name: p.name?.trim() || `${user?.name || "Traveler"} ${idx + 1}`,
-        age: parseInt(p.age || "18", 10) || 18,
+        ageGroup: p.ageGroup,
+        gender: p.gender,
       }));
 
       const res = await createBooking({
@@ -210,40 +212,89 @@ export default function BookingScreen() {
           </View>
           {/* Participants details */}
           {participants.map((p, idx) => (
-            <View key={idx} style={styles.participantRow}>
-              <View style={styles.participantField}>
-                <Text style={styles.participantLabel}>{t("name")}</Text>
-                <View style={styles.participantInputWrap}>
-                  <Text style={styles.participantPrefix}>{idx + 1}.</Text>
-                  <TextInput
-                    placeholder={t("full_name")}
-                    value={p.name}
-                    onChangeText={(text) =>
-                      setParticipants((prev) => {
-                        const next = [...prev];
-                        next[idx] = { ...next[idx], name: text };
-                        return next;
-                      })
-                    }
-                    style={styles.participantInput}
-                  />
+            <View key={idx} style={styles.participantCard}>
+              <Text style={styles.participantHeading}>
+                {t("traveler")} {idx + 1}
+              </Text>
+              <View style={styles.participantRow}>
+                <View style={styles.participantField}>
+                  <Text style={styles.participantLabel}>{t("name")}</Text>
+                  <View style={styles.participantInputWrap}>
+                    <Text style={styles.participantPrefix}>{idx + 1}.</Text>
+                    <TextInput
+                      placeholder={t("full_name")}
+                      value={p.name}
+                      onChangeText={(text) =>
+                        setParticipants((prev) => {
+                          const next = [...prev];
+                          next[idx] = { ...next[idx], name: text };
+                          return next;
+                        })
+                      }
+                      style={styles.participantInput}
+                    />
+                  </View>
                 </View>
               </View>
-              <View style={[styles.participantField, { maxWidth: 100 }]}>
-                <Text style={styles.participantLabel}>{t("age")}</Text>
-                <TextInput
-                  placeholder="18"
-                  keyboardType="number-pad"
-                  value={p.age}
-                  onChangeText={(text) =>
-                    setParticipants((prev) => {
-                      const next = [...prev];
-                      next[idx] = { ...next[idx], age: text };
-                      return next;
-                    })
-                  }
-                  style={styles.participantInput}
-                />
+              <View style={styles.segmentGroup}>
+                <Text style={styles.segmentLabel}>{t("age_group")}</Text>
+                <View style={styles.segmentRow}>
+                  {AGE_GROUPS.map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      style={[
+                        styles.segmentBtn,
+                        p.ageGroup === g && styles.segmentBtnActive,
+                      ]}
+                      onPress={() =>
+                        setParticipants((prev) => {
+                          const next = [...prev];
+                          next[idx] = { ...next[idx], ageGroup: g };
+                          return next;
+                        })
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.segmentText,
+                          p.ageGroup === g && styles.segmentTextActive,
+                        ]}
+                      >
+                        {g}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <View style={styles.segmentGroup}>
+                <Text style={styles.segmentLabel}>{t("gender")}</Text>
+                <View style={styles.segmentRow}>
+                  {GENDERS.map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      style={[
+                        styles.segmentBtn,
+                        p.gender === g && styles.segmentBtnActive,
+                      ]}
+                      onPress={() =>
+                        setParticipants((prev) => {
+                          const next = [...prev];
+                          next[idx] = { ...next[idx], gender: g };
+                          return next;
+                        })
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.segmentText,
+                          p.gender === g && styles.segmentTextActive,
+                        ]}
+                      >
+                        {g}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </View>
           ))}
@@ -552,6 +603,20 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 16,
   },
+  participantCard: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: "#f7fafc",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  participantHeading: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2d3748",
+    marginBottom: 8,
+  },
   participantField: {
     flex: 1,
   },
@@ -582,5 +647,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: 6,
     color: "#2d3748",
+  },
+  segmentGroup: {
+    marginTop: 12,
+  },
+  segmentLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#718096",
+    marginBottom: 6,
+  },
+  segmentRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  segmentBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  segmentBtnActive: {
+    backgroundColor: "#667eea",
+    borderColor: "#667eea",
+  },
+  segmentText: {
+    fontSize: 12,
+    color: "#2d3748",
+    fontWeight: "500",
+  },
+  segmentTextActive: {
+    color: "#ffffff",
   },
 });

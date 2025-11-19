@@ -2,6 +2,13 @@ const { PrismaClient } = require("@prisma/client");
 const QRCode = require("qrcode");
 const fs = require("fs");
 const path = require("path");
+let sharp = null;
+try {
+  sharp = require("sharp");
+} catch (e) {
+  // sharp is optional; fallback will use QR image only
+  console.warn("sharp not installed; ticket images will use QR only");
+}
 const prisma = new PrismaClient();
 
 const generateBadgeNumber = () => {
@@ -377,6 +384,63 @@ const updatePaymentStatus = async (req, res, next) => {
                 fs.writeFileSync(filePath, Buffer.from(base64, "base64"));
                 // Store relative URL; clients prepend their own base origin
                 storedQr = `/uploads/tickets/${fileName}`;
+
+                // Attempt to compose a nicer ticket image with travel & name if sharp available
+                if (sharp) {
+                  try {
+                    const ticketName = String(p.name || `Traveler ${idx + 1}`);
+                    const travelTitle = String(payment.booking?.travel?.title || "Travel");
+
+                    const qrAbs = filePath; // absolute path to QR PNG
+
+                    // Create base canvas 800x400 with white background
+                    const width = 800;
+                    const height = 400;
+
+                    // Build an SVG overlay with the text block on the left
+                    const svg = Buffer.from(
+                      `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                          <style>
+                            .title { font: 700 36px 'Arial'; fill: #111827; }
+                            .label { font: 500 20px 'Arial'; fill: #6B7280; }
+                            .value { font: 600 24px 'Arial'; fill: #111827; }
+                          </style>
+                        </defs>
+                        <rect width="100%" height="100%" fill="#ffffff"/>
+                        <rect x="0" y="0" width="100%" height="80" fill="#2563EB"/>
+                        <text x="32" y="50" class="title" fill="#ffffff">Travel Ticket</text>
+                        <g transform="translate(32,120)">
+                          <text class="label" x="0" y="0">Traveler</text>
+                          <text class="value" x="0" y="32">${ticketName.replace(/&/g,'&amp;')}</text>
+                          <text class="label" x="0" y="80">Travel</text>
+                          <text class="value" x="0" y="112">${travelTitle.replace(/&/g,'&amp;')}</text>
+                          <text class="label" x="0" y="160">Badge</text>
+                          <text class="value" x="0" y="192">${badgeNumber}</text>
+                        </g>
+                      </svg>`
+                    );
+
+                    // Compose: left side text, right side QR (350x350)
+                    const qrBuffer = fs.readFileSync(qrAbs);
+                    const ticketOut = path.join(
+                      uploadsDir,
+                      `ticket_${payment.bookingId}_${idx + 1}_${Date.now()}.png`
+                    );
+                    const composed = await sharp({ create: { width, height, channels: 3, background: '#ffffff' } })
+                      .png()
+                      .composite([
+                        { input: svg, top: 0, left: 0 },
+                        { input: qrBuffer, top: 25, left: width - 375, gravity: 'northwest' },
+                      ])
+                      .toFile(ticketOut);
+
+                    // Replace stored QR url with composed ticket card image that contains QR
+                    storedQr = `/uploads/tickets/${path.basename(ticketOut)}`;
+                  } catch (composeErr) {
+                    console.warn("Ticket compose failed; using QR only", composeErr.message);
+                  }
+                }
               } catch (e) {
                 console.warn(
                   "QR file write failed; falling back to data URI",

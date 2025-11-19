@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import * as ImagePicker from "expo-image-picker";
 import Constants from "expo-constants";
 import { resolveImageUrl } from "@/src/utils/image";
+import * as Clipboard from "expo-clipboard";
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -48,6 +49,7 @@ export default function BookingDetailScreen() {
   const [couponError, setCouponError] = useState<string>("");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   // Date picker could be implemented with a modal; keep flag if needed later.
+  const [copiedAccount, setCopiedAccount] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -305,7 +307,12 @@ export default function BookingDetailScreen() {
                   {idx + 1}. {String(p.name)}
                 </Text>
                 <Text style={styles.muted}>
-                  {String(p.age)} {t("yrs") || "yrs"}
+                  {p.ageGroup
+                    ? String(p.ageGroup)
+                    : p.age
+                    ? `${String(p.age)} ${t("yrs") || "yrs"}`
+                    : ""}
+                  {p.gender ? ` • ${String(p.gender)}` : ""}
                 </Text>
               </View>
             ))
@@ -416,7 +423,7 @@ export default function BookingDetailScreen() {
                     >
                       {b.logoUrl ? (
                         <Image
-                          source={{ uri: resolveImageUrl(b.logoUrl) }}
+                          source={{ uri: resolveImageUrl(b.logoUrl) ?? "" }}
                           // source={{ uri: b.logoUrl }}
                           style={styles.bankLogo}
                         />
@@ -445,7 +452,9 @@ export default function BookingDetailScreen() {
                 <View style={styles.bankDetailHeader}>
                   {selectedBank.logoUrl ? (
                     <Image
-                      source={{ uri: selectedBank.logoUrl }}
+                      source={{
+                        uri: resolveImageUrl(selectedBank.logoUrl) ?? "",
+                      }}
                       style={styles.bankDetailLogo}
                     />
                   ) : null}
@@ -463,9 +472,49 @@ export default function BookingDetailScreen() {
                   <Text style={styles.bankDetailLabel}>
                     {t("account_number") || "Account Number"}:
                   </Text>
-                  <Text style={styles.bankDetailValue}>
-                    {selectedBank.accountNumber}
-                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      flex: 1,
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text style={[styles.bankDetailValue, { flexShrink: 1 }]}>
+                      {selectedBank.accountNumber}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(
+                          String(selectedBank.accountNumber || "")
+                        );
+                        setCopiedAccount(true);
+                        setTimeout(() => setCopiedAccount(false), 1800);
+                      }}
+                      style={{
+                        marginLeft: 12,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderWidth: 1,
+                        borderColor: copiedAccount ? "#48bb78" : "#cbd5e0",
+                        borderRadius: 8,
+                        backgroundColor: copiedAccount ? "#f0fff4" : "#ffffff",
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: copiedAccount ? "#2f855a" : "#667eea",
+                          fontWeight: "600",
+                        }}
+                      >
+                        {copiedAccount
+                          ? t("copied") || "Copied"
+                          : t("copy") || "Copy"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             )}

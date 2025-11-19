@@ -31,6 +31,7 @@ const BankManagement = () => {
   const [sortField, setSortField] = useState("id");
   const [sortDir, setSortDir] = useState("desc");
   const [dropdownOpen, setDropdownOpen] = useState(null);
+  const [copiedBankId, setCopiedBankId] = useState(null);
 
   const dropdownRefs = useRef({});
 
@@ -188,6 +189,33 @@ const BankManagement = () => {
       await load();
     } catch (e) {
       setError(e.message || "Failed to delete bank");
+    }
+  };
+
+  const handleCopy = async (bank) => {
+    const text = bank.accountNumber || "";
+    if (!text) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for older browsers
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.top = "-1000px";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedBankId(bank.id);
+      setTimeout(() => setCopiedBankId(null), 2000);
+    } catch (e) {
+      console.error("Copy failed", e);
+      setError("Failed to copy account number");
+      setTimeout(() => setError(""), 2500);
     }
   };
 
@@ -413,9 +441,52 @@ const BankManagement = () => {
             key: "accountNumber",
             header: sortableHeader("Account Number", "accountNumber"),
             render: (row) => (
-              <span className="font-mono text-sm font-bold text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
-                {row.accountNumber}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm font-bold text-gray-700 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                  {row.accountNumber}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(row)}
+                  className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300 text-gray-500 hover:text-blue-600 transition-colors shadow-sm"
+                  title="Copy account number"
+                >
+                  {copiedBankId === row.id ? (
+                    <svg
+                      className="w-4 h-4 text-green-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 16h8M8 12h8m-9 8h10a2 2 0 002-2V6a2 2 0 00-2-2H9l-3 3v13a2 2 0 002 2z"
+                      />
+                    </svg>
+                  )}
+                </button>
+                {copiedBankId === row.id && (
+                  <span className="text-xs font-semibold text-green-600 animate-fade-in">
+                    Copied
+                  </span>
+                )}
+              </div>
             ),
           },
           {
